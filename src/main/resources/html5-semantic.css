@@ -1,0 +1,59 @@
+div, p, strong, em {
+  position: relative;
+}
+div::before, p::before, strong::before, em::before {
+  position: absolute;
+  font-size: 70%;
+  right: 0;
+  top: 0;
+  padding: 1px;
+  color: white;
+  font-weight: normal;
+  font-style: normal;
+  font-family: sans-serif;
+}
+div, p {
+  margin: 0;
+  padding: 15px;
+}
+div ~ *, p ~ * {
+  margin-top: 15px;
+}
+strong, em {
+  padding: 1px;
+}
+div {
+  border: 1px solid #ff9900;
+  background: #ffeedd;
+}
+div::before {
+  content: "div";
+  background: #ff9900;
+}
+p {
+  border: 1px solid #77cc99;
+  background: #d8f2e7;
+}
+p::before {
+  content: "p";
+  background: #77cc99;
+}
+strong {
+  border: 1px solid #aa55ee;
+  background: #e7ddfa;
+  padding-right: 35px;
+  /* font-weight: normal; */
+}
+strong::before {
+  content: "strong";
+  background: #aa55ee;
+}
+em {
+  border: 1px solid #ee88cc;
+  background: #f6ccdd;
+  padding-right: 20px;
+}
+em::before {
+  content: "em";
+  background: #ee88cc;
+}
