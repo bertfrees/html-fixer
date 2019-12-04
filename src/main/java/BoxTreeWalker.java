@@ -24,6 +24,8 @@ class BoxTreeWalker implements Cloneable {
 
 	// view of the portion of the tree with the current box as the root
 	public BoxTreeWalker subTree() {
+		if (path.isEmpty())
+			return this;
 		BoxTreeWalker fullTree = this;
 		return new BoxTreeWalker(fullTree.current()) {
 			@Override

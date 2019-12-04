@@ -69,9 +69,9 @@ public class BoxTreeWalkerTest {
 		URL html = BoxTreeWalkerTest.class.getResource("test.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
-		transformSingleRowTable(walker, 0, 3);
+		walker = transformSingleRowTable(walker, 0, 3);
 		walker.root();
-		markupHeading(walker, 2);
+		walker = markupHeading(walker, 0, 3);
 		utils.serialize(walker.root());
 		utils.render(walker.root(), true);
 		utils.render(walker.root(), false);
@@ -81,9 +81,9 @@ public class BoxTreeWalkerTest {
 	 * @param firstBlockIdx 0-based index of first block
 	 * @param blockCount number of blocks in table row (must be at least one)
 	 */
-	private static void transformSingleRowTable(BoxTreeWalker doc,
-	                                            int firstBlockIdx,
-	                                            int blockCount) throws CanNotPerformTransformationException {
+	private static BoxTreeWalker transformSingleRowTable(BoxTreeWalker doc,
+	                                                     int firstBlockIdx,
+	                                                     int blockCount) throws CanNotPerformTransformationException {
 		nthBlock(doc, firstBlockIdx);
 		while (true) {
 			assertThat(!doc.previousSibling().isPresent());
@@ -119,22 +119,39 @@ public class BoxTreeWalkerTest {
 		doc.unwrapParent();
 		BoxTreeWalker table = doc.subTree();
 		assertThat(count(table, Box::isBlockAndHasNoBlockChildren) == blockCount);
+		return doc;
 	}
 
-	private static void markupHeading(BoxTreeWalker doc,
-	                                  int blockIdx) throws CanNotPerformTransformationException {
-		nthBlock(doc, blockIdx);
-		doc.renameCurrent(H1);
-		// if only child is a strong, remove it
-		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
-		// both are related enough do perform in a single fix
-		if (doc.firstChild().isPresent()) {
-			if (STRONG.equals(doc.current().getName())
-			    && !doc.nextSibling().isPresent()) {
-				doc.parent();
-				doc.unwrapFirstChild();
+	private static BoxTreeWalker markupHeading(BoxTreeWalker doc,
+	                                           int firstBlockIdx,
+	                                           int blockCount) throws CanNotPerformTransformationException {
+		nthBlock(doc, firstBlockIdx);
+		// find ancestor that contains the specified number of blocks
+		while (true) {
+			BoxTreeWalker tmp = doc.clone();
+			if (!tmp.previousSibling().isPresent()
+			    && tmp.parent().isPresent()
+			    && count(tmp, Box::isBlockAndHasNoBlockChildren) <= blockCount) {
+				doc = tmp;
+			} else {
+				assertThat(count(doc, Box::isBlockAndHasNoBlockChildren) == blockCount);
+				break;
 			}
 		}
+		doc.renameCurrent(H1);
+		// remove all strong within the heading
+		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
+		// both are related enough do perform in a single fix
+		BoxTreeWalker h1 = doc.subTree();
+		Predicate<Box> isStrong = b -> STRONG.equals(b.getName());
+		while (h1.firstDescendant(isStrong).isPresent() || h1.firstFollowing(isStrong).isPresent())
+			if (h1.previousSibling().isPresent())
+				h1.unwrapNextSibling();
+			else if (h1.parent().isPresent())
+				h1.unwrapFirstChild();
+			else
+				throw new RuntimeException("coding error");
+		return doc;
 	}
 
 	private static void nthBlock(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
@@ -143,9 +160,11 @@ public class BoxTreeWalkerTest {
 			assertThat(doc.firstFollowing(Box::isBlockAndHasNoBlockChildren).isPresent());
 	}
 
-	// count number of boxes within the tree that pass filter
+	// count number of boxes within the current element (including the element itself) that pass filter
 	private static int count(BoxTreeWalker tree, Predicate<Box> filter) {
+		tree = tree.subTree();
 		int count = 0;
+		if (filter.test(tree.current())) count++;
 		while (tree.firstDescendant(filter).isPresent() || tree.firstFollowing(filter).isPresent())
 			count++;
 		return count;
