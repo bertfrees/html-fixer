@@ -14,6 +14,7 @@ public class BoxTreeWalkerTest {
 
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 	private static final QName DIV = new QName(HTML_NS, "div");
+	private static final QName _SPAN = new QName(HTML_NS, "_span");
 	private static final QName H1 = new QName(HTML_NS, "h1");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
 
@@ -151,6 +152,11 @@ public class BoxTreeWalkerTest {
 				h1.unwrapFirstChild();
 			else
 				throw new RuntimeException("coding error");
+		// remove all div within the heading
+		h1Walker.root();
+		Predicate<Box> isDiv = b -> DIV.equals(b.getName());
+		while (h1Walker.firstDescendant(isDiv).isPresent() || h1Walker.firstFollowing(isDiv).isPresent())
+			h1Walker.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
 		return doc;
 	}
 

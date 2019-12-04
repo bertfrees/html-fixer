@@ -45,9 +45,15 @@ public class Renderer {
 	}
 
 	private static void render(XMLStreamWriter writer, Box box, BoxProperties parentBox, boolean preserveStyle) throws XMLStreamException {
-		if (box.isAnonymous())
-			XMLStreamWriterHelper.writeStartElement(writer, box instanceof Box.BlockBox ? DIV : SPAN);
-		else {
+		if (box.isAnonymous() || box.getName().getLocalPart().startsWith("_")) {
+			QName name = box.getName();
+			XMLStreamWriterHelper.writeStartElement(
+				writer,
+				name != null ? new QName(name.getNamespaceURI(),
+				                         name.getLocalPart().substring(1),
+				                         name.getPrefix())
+				             : box instanceof Box.BlockBox ? DIV : SPAN);
+		} else {
 			XMLStreamWriterHelper.writeStartElement(writer, box.getName());
 			for (Map.Entry<QName,String> a : box.getAttributes().entrySet())
 				if (!STYLE.equals(a.getKey()) && !CLASS.equals(a.getKey()))
