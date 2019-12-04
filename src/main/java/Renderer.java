@@ -37,41 +37,85 @@ public class Renderer {
 			XMLStreamWriterHelper.writeAttribute(writer, HREF, preserveStyle ? RESET_CSS : SEMANTIC_CSS);
 			writer.writeEndElement();
 			writer.writeEndElement();
-			render(writer, box, null, preserveStyle);
+			render(writer, box, null, true, preserveStyle);
 			writer.writeEndElement();
 		} catch (XMLStreamException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	private static void render(XMLStreamWriter writer, Box box, BoxProperties parentBox, boolean preserveStyle) throws XMLStreamException {
+	private static boolean render(XMLStreamWriter writer,
+	                              Box box,
+	                              BoxProperties parentBox,
+	                              boolean renderingWillStartNewBlock,
+	                              boolean preserveStyle) throws XMLStreamException {
+		String styleAttr = null;
+		if (preserveStyle)
+			styleAttr = serializeCascadedProperties(((BoxPropertiesImpl)box.props()).relativize((BoxPropertiesImpl)parentBox));
+		boolean skippedStartElement = false;
 		if (box.isAnonymous() || box.getName().getLocalPart().startsWith("_")) {
-			QName name = box.getName();
-			XMLStreamWriterHelper.writeStartElement(
-				writer,
-				name != null ? new QName(name.getNamespaceURI(),
-				                         name.getLocalPart().substring(1),
-				                         name.getPrefix())
-				             : box instanceof Box.BlockBox ? DIV : SPAN);
+			if (styleAttr == null) {
+				if (!(box instanceof Box.BlockBox && !renderingWillStartNewBlock))
+					skippedStartElement = true;
+				else if (!box.hasText()) {
+					boolean childrenWillRender = false;
+					for (Box b : box)
+						if (willRender(b, box.props, preserveStyle)) {
+							childrenWillRender = true;
+							break;
+						}
+					if (!childrenWillRender)
+						skippedStartElement = true;
+				}
+			}
+			if (!skippedStartElement) {
+				QName name = box.getName();
+				XMLStreamWriterHelper.writeStartElement(
+					writer,
+					name != null ? new QName(name.getNamespaceURI(),
+					                         name.getLocalPart().substring(1),
+					                         name.getPrefix())
+					             : box instanceof Box.BlockBox ? DIV : SPAN);
+				if (box instanceof Box.BlockBox)
+					renderingWillStartNewBlock = true;
+			}
 		} else {
 			XMLStreamWriterHelper.writeStartElement(writer, box.getName());
 			for (Map.Entry<QName,String> a : box.getAttributes().entrySet())
 				if (!STYLE.equals(a.getKey()) && !CLASS.equals(a.getKey()))
 					XMLStreamWriterHelper.writeAttribute(writer, a);
 		}
-		if (preserveStyle) {
-			String styleAttr = serializeCascadedProperties(((BoxPropertiesImpl)box.props()).relativize((BoxPropertiesImpl)parentBox));
-			if (styleAttr != null)
-				XMLStreamWriterHelper.writeAttribute(writer, STYLE, styleAttr);
-		}
+		if (styleAttr != null)
+			XMLStreamWriterHelper.writeAttribute(writer, STYLE, styleAttr);
 		if (box instanceof Box.InlineBox) {
 			String text = ((Box.InlineBox)box).text();
 			if (text != null)
 				writer.writeCharacters(text);
 		}
 		for (Box b : box)
-			render(writer, b, box.props, preserveStyle);
-		writer.writeEndElement();
+			renderingWillStartNewBlock = render(writer, b, box.props, renderingWillStartNewBlock, preserveStyle);
+		if (!skippedStartElement) {
+			writer.writeEndElement();
+			if (box instanceof Box.BlockBox)
+				renderingWillStartNewBlock = true;
+		}
+		if (box instanceof Box.InlineBox)
+			renderingWillStartNewBlock = false;
+		return renderingWillStartNewBlock;
+	}
+
+	private static boolean willRender(Box box, BoxProperties parentBox, boolean preserveStyle) throws XMLStreamException {
+		if (!box.isAnonymous() && !box.getName().getLocalPart().startsWith("_"))
+			return true;
+		if (box.hasText())
+			return true;
+		if (preserveStyle)
+			if (serializeCascadedProperties(((BoxPropertiesImpl)box.props()).relativize((BoxPropertiesImpl)parentBox)) != null)
+				return true;
+		for (Box b : box)
+			if (willRender(b, box.props, preserveStyle))
+				return true;
+		return false;
 	}
 
 	private static void render(XMLStreamWriter writer, Node node) throws XMLStreamException {
