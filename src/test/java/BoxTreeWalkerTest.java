@@ -65,7 +65,7 @@ public class BoxTreeWalkerTest {
 		URL html = BoxTreeWalkerTest.class.getResource("test.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
-		transformSingleRowTable(walker, 3, 3);
+		transformSingleRowTable(walker, 0, 3);
 		utils.serialize(walker.root());
 		utils.render(walker.root(), true);
 		utils.render(walker.root(), false);
@@ -101,25 +101,14 @@ public class BoxTreeWalkerTest {
 		assertThat(doc.current().props.display().equals("table-row"));
 		doc.renameCurrent(DIV);
 		assertThat(!doc.nextSibling().isPresent());
-		boolean colgroupPresent = false;
-		if (doc.previousSibling().isPresent()) {
-			assertThat(doc.current().props.display().equals("table-column-group"));
-			assertThat(!doc.previousSibling().isPresent());
-			colgroupPresent = true;
-		}
+		assertThat(!doc.previousSibling().isPresent());
 		assertThat(doc.parent().isPresent());
-		if (!colgroupPresent && doc.current().props.display().equals("table-row-group")) {
+		if (doc.current().props.display().equals("table-row-group")) {
 			assertThat(!doc.nextSibling().isPresent());
-			if (doc.previousSibling().isPresent()) {
-				assertThat(doc.current().props.display().equals("table-column-group"));
-				assertThat(!doc.previousSibling().isPresent());
-				colgroupPresent = true;
-			}
+			assertThat(!doc.previousSibling().isPresent());
 			assertThat(doc.parent().isPresent());
 		}
 		assertThat(doc.current().props.display().equals("table"));
-		if (colgroupPresent)
-			doc.deleteFirstChild();
 		doc.firstChild();
 		doc.unwrapParent();
 		BoxTreeWalker table = doc.subTree();

@@ -110,12 +110,15 @@ public class Element implements Node {
 		return children;
 	}
 
-	// returns null if the display property of this element or one of its ancestors is "none"
+	// returns null if the display property of this element or one of its ancestors is "none",
+	// "table-column-group" or "table-column"
 	// note that the CSS box module allows elements of type inline to contain elements of type block
 	// in which case it will not map to a box either, but this is not supported in this model
 	private Box box = null;
 	public Box getBox() {
-		if (getComputedDisplay().equals("none"))
+		if (getComputedDisplay().equals("none")
+		    || getComputedDisplay().equals("table-column-group")
+		    || getComputedDisplay().equals("table-column"))
 			return null;
 		if (box == null) {
 			Box parentBox = parent == null ? null : parent.getBox();
@@ -124,7 +127,9 @@ public class Element implements Node {
 				throw new RuntimeException();
 			if (!isBlock
 			    && !Iterables.any(children,
-			                      n -> n instanceof Element && !((Element)n).getComputedDisplay().equals("none")))
+			                      n -> n instanceof Element && !(((Element)n).getComputedDisplay().equals("none")
+			                                                     || ((Element)n).getComputedDisplay().equals("table-column-group")
+			                                                     || ((Element)n).getComputedDisplay().equals("table-column"))))
 				box = new Box.InlineBox(this, parentBox, stringValue(children));
 			else {
 				Function<Box,Supplier<Box>> childBoxes = thisBox ->
@@ -248,7 +253,9 @@ public class Element implements Node {
 				s.append(((Text)n).characters());
 			else {
 				Element e = (Element)n;
-				if (!e.getComputedDisplay().equals("none"))
+				if (!(e.getComputedDisplay().equals("none")
+				      || e.getComputedDisplay().equals("table-column-group")
+				      || e.getComputedDisplay().equals("table-column")))
 					s.append(stringValue(e.children()));
 			}
 		}
