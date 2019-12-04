@@ -1,3 +1,6 @@
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -6,6 +9,9 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
 import org.daisy.common.stax.XMLStreamWriterHelper;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.Iterables;
 
 public class Serializer {
 
@@ -36,6 +42,92 @@ public class Serializer {
 		} catch (XMLStreamException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	public static void serializeToJSON(Writer writer, Box box) {
+		try {
+			writer.append("{");
+			writer.append("\"type\":").append(box instanceof Box.BlockBox ? "1" : "0");
+			writer.append(",");
+			writer.append("\"name\":");
+			if (box.isAnonymous())
+				writer.append("null");
+			else
+				serializeToJSON(writer, box.getName());
+			writer.append(",");
+			writer.append("\"attributes\":[");
+			writer.append(
+				Joiner.on(",").join(
+					Iterables.transform(
+						box.getAttributes().entrySet(),
+						a -> (
+							"{\"name\":"
+							+ serializeToJSON(a.getKey())
+							+ ",\"value\":\""
+							+ escapeForJSONString(a.getValue()) + "\"}"
+						))));
+			writer.append("],");
+			String text = box instanceof Box.InlineBox ? ((Box.InlineBox)box).text() : null;
+			if (text != null)
+				writer.append("\"text\":\"").append(escapeForJSONString(text)).append("\"");
+			else
+				writer.append("\"text\":null");
+			writer.append(",");
+			writer.append("\"children\":[");
+			writer.append(
+				Joiner.on(",").join(
+					Iterables.transform(box, Serializer::serializeToJSON)));
+			writer.append("]");
+			writer.append(",");
+			writer.append("\"props\":{");
+			BoxProperties props = box.props();
+			writer.append(
+				Joiner.on(",").join(
+					Iterables.transform(
+						props.keySet,
+						p -> {
+							Object val = props.get(p);
+							String v;
+							if (val == null)
+								v = "null";
+							else if (val instanceof String)
+								v = "\"" + escapeForJSONString(val.toString()) + "\"";
+							else
+								throw new RuntimeException();
+							return "\"" + p + "\":" + v; })));
+			writer.append("}");
+			writer.append("}");
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private static void serializeToJSON(Writer writer, QName name) {
+		try {
+			writer.append("{");
+			writer.append("\"namespace\":\"").append(name.getNamespaceURI()).append("\",");
+			writer.append("\"localPart\":\"").append(name.getLocalPart()).append("\",");
+			writer.append("\"prefix\":\"").append(name.getPrefix()).append("\"");
+			writer.append("}");
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private static String escapeForJSONString(String str) {
+		return str;
+	}
+
+	private static String serializeToJSON(Box box) {
+		StringWriter writer = new StringWriter();
+		serializeToJSON(writer, box);
+		return writer.toString();
+	}
+
+	private static String serializeToJSON(QName name) {
+		StringWriter writer = new StringWriter();
+		serializeToJSON(writer, name);
+		return writer.toString();
 	}
 
 	private static void serializeBox(XMLStreamWriter writer, Box box, Box parentBox) throws XMLStreamException {
