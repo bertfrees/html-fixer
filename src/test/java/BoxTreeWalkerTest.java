@@ -14,6 +14,8 @@ public class BoxTreeWalkerTest {
 
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 	private static final QName DIV = new QName(HTML_NS, "div");
+	private static final QName H1 = new QName(HTML_NS, "h1");
+	private static final QName STRONG = new QName(HTML_NS, "strong");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -60,12 +62,16 @@ public class BoxTreeWalkerTest {
 	}
 
 	@Test
-	public void testTransformSingleRowTable() throws XMLStreamException, IOException, SaxonApiException, InterruptedException,
-	                                                 CanNotPerformTransformationException {
+	public void testTransformTheCodfishDreamChapter1()
+		throws XMLStreamException, IOException, SaxonApiException, InterruptedException,
+		       CanNotPerformTransformationException {
+
 		URL html = BoxTreeWalkerTest.class.getResource("test.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
 		transformSingleRowTable(walker, 0, 3);
+		walker.root();
+		markupHeading(walker, 2);
 		utils.serialize(walker.root());
 		utils.render(walker.root(), true);
 		utils.render(walker.root(), false);
@@ -113,6 +119,22 @@ public class BoxTreeWalkerTest {
 		doc.unwrapParent();
 		BoxTreeWalker table = doc.subTree();
 		assertThat(count(table, Box::isBlockAndHasNoBlockChildren) == blockCount);
+	}
+
+	private static void markupHeading(BoxTreeWalker doc,
+	                                  int blockIdx) throws CanNotPerformTransformationException {
+		nthBlock(doc, blockIdx);
+		doc.renameCurrent(H1);
+		// if only child is a strong, remove it
+		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
+		// both are related enough do perform in a single fix
+		if (doc.firstChild().isPresent()) {
+			if (STRONG.equals(doc.current().getName())
+			    && !doc.nextSibling().isPresent()) {
+				doc.parent();
+				doc.unwrapFirstChild();
+			}
+		}
 	}
 
 	private static void nthBlock(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {

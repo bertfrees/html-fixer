@@ -1,7 +1,7 @@
-div, p, strong, em {
+div, p, h1, strong, em {
   position: relative;
 }
-div::before, p::before, strong::before, em::before {
+div::before, p::before, h1::before, strong::before, em::before {
   position: absolute;
   font-size: 70%;
   right: 0;
@@ -12,11 +12,11 @@ div::before, p::before, strong::before, em::before {
   font-style: normal;
   font-family: sans-serif;
 }
-div, p {
+div, p, h1 {
   margin: 0;
   padding: 15px;
 }
-div ~ *, p ~ * {
+div ~ *, p ~ *, h1 ~ * {
   margin-top: 15px;
 }
 strong, em {
@@ -37,6 +37,14 @@ p {
 p::before {
   content: "p";
   background: #77cc99;
+}
+h1 {
+  border: 1px solid #ff5500;
+  background: #ffbbaa;
+}
+h1::before {
+  content: "h1";
+  background: #ff5500;
 }
 strong {
   border: 1px solid #aa55ee;
