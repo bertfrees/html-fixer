@@ -79,7 +79,7 @@ public class Box implements Iterable<Box> {
 					throw new IllegalArgumentException("no adjacent anonymous block boxes");
 				prevIsAnonymous = c.isAnonymous();
 			}
-			isBlockAndHasNoBlockChildren = hasBlockChildren;
+			isBlockAndHasNoBlockChildren = !hasBlockChildren;
 		} else {
 			for (Box c : children)
 				if (c instanceof BlockBox)
