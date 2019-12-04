@@ -12,11 +12,15 @@ import com.google.common.collect.ImmutableSet;
 
 public class Box implements Iterable<Box> {
 
+	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
+	private static final QName IMG = new QName(HTML_NS, "img");
+
 	private final QName name;
 	private final Map<QName,String> attributes;
 	private final ListIterable<Box> children;
 	protected final String text;
 	protected final BoxPropertiesImpl props;
+	protected final boolean replacedElement;
 
 	// parent is the original parent box in the original box tree
 	// it is only used for determining the box properties
@@ -31,6 +35,7 @@ public class Box implements Iterable<Box> {
 			? MemoizingIterator.iterable(children.apply(this))
 			: noChildren;
 		this.text = text;
+		this.replacedElement = IMG.equals(name);
 	}
 
 	private Box(Element element, Box parent, Function<Box,Supplier<Box>> children, String text, Style style) {
@@ -48,6 +53,7 @@ public class Box implements Iterable<Box> {
 		this.props = box.props;
 		this.children = box.children;
 		this.text = box.text;
+		this.replacedElement = box.replacedElement;
 		this.name = newName.getName();
 		this.attributes = newName.getAttributes();
 	}
@@ -56,6 +62,7 @@ public class Box implements Iterable<Box> {
 		this.props = box.props;
 		this.children = box.children;
 		this.text = box.text;
+		this.replacedElement = box.replacedElement;
 		this.name = newName;
 		this.attributes = Collections.<QName,String>emptyMap();
 	}
@@ -66,6 +73,7 @@ public class Box implements Iterable<Box> {
 		this.attributes = box.attributes;
 		this.props = box.props;
 		this.text = box.text;
+		this.replacedElement = box.replacedElement;
 		this.children = MemoizingIterator.iterable(newChildren);
 		if (this instanceof BlockBox) {
 			Boolean hasBlockChildren = null;
@@ -180,6 +188,21 @@ public class Box implements Iterable<Box> {
 				}
 		}
 		return isBlockAndHasNoBlockChildren;
+	}
+
+	private Boolean hasText = null;
+	public boolean hasText() {
+		if (hasText == null) {
+			if (this instanceof InlineBox)
+				hasText = ((InlineBox)this).text() != null;
+			else
+				hasText = false;
+		}
+		return hasText;
+	}
+
+	public boolean isReplacedElement() {
+		return replacedElement;
 	}
 
 	public boolean isAnonymous() {

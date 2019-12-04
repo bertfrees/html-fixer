@@ -87,11 +87,8 @@ public class Renderer {
 		}
 		if (styleAttr != null)
 			XMLStreamWriterHelper.writeAttribute(writer, STYLE, styleAttr);
-		if (box instanceof Box.InlineBox) {
-			String text = ((Box.InlineBox)box).text();
-			if (text != null)
-				writer.writeCharacters(text);
-		}
+		if (box.hasText())
+			writer.writeCharacters(((Box.InlineBox)box).text());
 		for (Box b : box)
 			renderingWillStartNewBlock = render(writer, b, box.props, renderingWillStartNewBlock, preserveStyle);
 		if (!skippedStartElement) {

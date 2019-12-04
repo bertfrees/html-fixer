@@ -245,7 +245,7 @@ class BoxTreeWalker implements Cloneable {
 			throw new RuntimeException("there is no first child");
 		Box firstChild = children.next();
 		children.previous();
-		Supplier<Box> newChildren = (firstChild instanceof Box.InlineBox && ((Box.InlineBox)firstChild).text() != null)
+		Supplier<Box> newChildren = firstChild.hasText()
 			? updateIn(children, 0, firstChild.copy((QName)null))
 			: updateIn(children, 0, firstChild.children());
 		updateCurrent(current.copy(newChildren));
@@ -262,7 +262,7 @@ class BoxTreeWalker implements Cloneable {
 		Box parent = parent().get();
 		Box nextSibling = siblings.next();
 		int i = rewind(siblings);
-		Supplier<Box> newSiblings = (nextSibling instanceof Box.InlineBox && ((Box.InlineBox)nextSibling).text() != null)
+		Supplier<Box> newSiblings = nextSibling.hasText()
 			? updateIn(siblings, i - 1, nextSibling.copy((QName)null))
 			: updateIn(siblings, i - 1, nextSibling.children());
 		updateCurrent(parent.copy(newSiblings));

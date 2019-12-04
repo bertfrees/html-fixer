@@ -78,6 +78,9 @@ public class Element implements Node {
 				public Iterator<Node> iterator() {
 					return new MemoizingIterator<Node>(list) {
 						public Node computeNext() {
+							// ignore child notes of replaced elements
+							if (IMG.equals(Element.this.name))
+								throw new NoSuchElementException();
 							if (children == null) {
 								children = element.getChildNodes();
 								size = children.getLength();

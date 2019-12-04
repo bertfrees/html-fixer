@@ -67,9 +67,8 @@ public class Serializer {
 							+ escapeForJSONString(a.getValue()) + "\"}"
 						))));
 			writer.append("],");
-			String text = box instanceof Box.InlineBox ? ((Box.InlineBox)box).text() : null;
-			if (text != null)
-				writer.append("\"text\":\"").append(escapeForJSONString(text)).append("\"");
+			if (box.hasText())
+				writer.append("\"text\":\"").append(escapeForJSONString(((Box.InlineBox)box).text())).append("\"");
 			else
 				writer.append("\"text\":null");
 			writer.append(",");
@@ -174,11 +173,10 @@ public class Serializer {
 			} else {
 				XMLStreamWriterHelper.writeStartElement(writer, INLINE_BOX);
 				XMLStreamWriterHelper.writeAttribute(writer, new QName("element"), box.getName().getLocalPart());
-				String text = ((Box.InlineBox)box).text();
-				if (text != null) {
+				if (box.hasText()) {
 					XMLStreamWriterHelper.writeStartElement(writer, INLINE_CONTENT);
 					// box with text can not have child boxes
-					writer.writeCharacters(text);
+					writer.writeCharacters(((Box.InlineBox)box).text());
 					writer.writeEndElement();
 				} else
 					for (Box c : box)

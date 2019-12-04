@@ -17,6 +17,7 @@ public class BoxTreeWalkerTest {
 	private static final QName _SPAN = new QName(HTML_NS, "_span");
 	private static final QName H1 = new QName(HTML_NS, "h1");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
+	private static final QName IMG = new QName(HTML_NS, "img");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -73,6 +74,7 @@ public class BoxTreeWalkerTest {
 		walker = transformSingleRowTable(walker, 0, 3);
 		walker.root();
 		walker = markupHeading(walker, 0, 3);
+		walker = removeImage(walker, 1, 0);
 		utils.serialize(walker.root());
 		utils.render(walker.root(), true);
 		utils.render(walker.root(), false);
@@ -160,10 +162,41 @@ public class BoxTreeWalkerTest {
 		return doc;
 	}
 
+	/*
+	 * @param blockIdx 0-based index of block that contains (or is) the img
+	 * @param inlineIdx 0-based index of img within the block, or -1 if the block is the img
+	 */
+	private static BoxTreeWalker removeImage(BoxTreeWalker doc,
+	                                         int blockIdx,
+	                                         int inlineIdx) throws CanNotPerformTransformationException {
+		nthBlock(doc, blockIdx);
+		if (inlineIdx >= 0) {
+			assertThat(inlineIdx < count(doc, b -> b.hasText() || b.isReplacedElement()));
+			nthReplacedElementOrTextBox(doc, inlineIdx);
+		}
+		assertThat(IMG.equals(doc.current().getName()));
+		assertThat(doc.current().isReplacedElement());
+		doc.renameCurrent(_SPAN);
+		// also remove parent elements that have no other content than the img
+		while (!doc.previousSibling().isPresent()
+		       && !doc.nextSibling().isPresent()
+		       && doc.parent().isPresent()) {
+			doc.renameCurrent(_SPAN);
+		}
+		return doc;
+	}
+
 	private static void nthBlock(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
 		assertThat(doc.firstDescendant(Box::isBlockAndHasNoBlockChildren).isPresent());
 		for (int i = 0; i < index; i++)
 			assertThat(doc.firstFollowing(Box::isBlockAndHasNoBlockChildren).isPresent());
+	}
+
+	private static void nthReplacedElementOrTextBox(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
+		Predicate<Box> isReplacedElementOrTextBox = b -> b.hasText() || b.isReplacedElement();
+		assertThat(doc.firstDescendant(isReplacedElementOrTextBox).isPresent());
+		for (int i = 0; i < index; i++)
+			assertThat(doc.firstFollowing(isReplacedElementOrTextBox).isPresent());
 	}
 
 	// count number of boxes within the current element (including the element itself) that pass filter
