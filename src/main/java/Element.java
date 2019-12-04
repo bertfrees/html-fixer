@@ -48,6 +48,8 @@ public class Element implements Node {
 									if (i < size()) {
 										org.w3c.dom.Node attr = attributes.item(i++);
 										QName name = nodeName(attr);
+										if ("http://www.w3.org/2000/xmlns/".equals(name.getNamespaceURI()))
+											return computeNext();
 										String value = attr.getNodeValue();
 										if (IMG.equals(Element.this.name) && SRC.equals(name))
 											value = baseURI.resolve(value).toString();
