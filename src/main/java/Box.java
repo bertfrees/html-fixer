@@ -83,7 +83,7 @@ public class Box implements Iterable<Box> {
 					hasBlockChildren = (c instanceof BlockBox);
 				else if (hasBlockChildren != (c instanceof BlockBox))
 					throw new IllegalArgumentException("block and inline can not be siblings");
-				if (c.isAnonymous() && Boolean.TRUE.equals(prevIsAnonymous))
+				if (c instanceof BlockBox && c.isAnonymous() && Boolean.TRUE.equals(prevIsAnonymous))
 					throw new IllegalArgumentException("no adjacent anonymous block boxes");
 				prevIsAnonymous = c.isAnonymous();
 			}
