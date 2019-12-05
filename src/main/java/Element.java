@@ -132,9 +132,11 @@ public class Element implements Node {
 			    && !Iterables.any(children,
 			                      n -> n instanceof Element && !(((Element)n).getComputedDisplay().equals("none")
 			                                                     || ((Element)n).getComputedDisplay().equals("table-column-group")
-			                                                     || ((Element)n).getComputedDisplay().equals("table-column"))))
-				box = new Box.InlineBox(this, parentBox, stringValue(children));
-			else {
+			                                                     || ((Element)n).getComputedDisplay().equals("table-column")))) {
+				String text = stringValue(children);
+				if (text.isEmpty()) text = null;
+				box = new Box.InlineBox(this, parentBox, text);
+			} else {
 				Function<Box,Supplier<Box>> childBoxes = thisBox ->
 					new Supplier<Box>() {
 						Boolean hasBlocks = null;
@@ -153,7 +155,7 @@ public class Element implements Node {
 								List<Node> g = inlineGroups.next();
 								if (g.get(0) instanceof Text) {
 									String text = stringValue(g);
-									if (!isWhiteSpaceOnly(text))
+									if (!text.isEmpty())
 										return new Box.AnonymousInlineBox(thisBox, text);
 								} else {
 									processElements = g.iterator();
@@ -179,7 +181,7 @@ public class Element implements Node {
 													for (List<Node> gg : groupAdjacent(g, Predicates.instanceOf(Text.class))) {
 														if (gg.get(0) instanceof Text) {
 															String text = stringValue(gg);
-															if (!isWhiteSpaceOnly(text))
+															if (!text.isEmpty())
 																inlineBoxes.add(new Box.AnonymousInlineBox(b, text));
 														} else
 															for (Node n : gg) {
