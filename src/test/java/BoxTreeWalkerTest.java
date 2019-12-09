@@ -72,7 +72,7 @@ public class BoxTreeWalkerTest {
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
 		walker = transformSingleRowTable(walker, 0, 3);
-		walker = markupHeading(walker, 0, 3);
+		walker = markupHeading(walker, 0, 3, H1);
 		walker = removeImage(walker, 1, 0);
 		utils.serialize(walker.root());
 		utils.render(walker.root(), true);
@@ -127,7 +127,8 @@ public class BoxTreeWalkerTest {
 
 	private static BoxTreeWalker markupHeading(BoxTreeWalker doc,
 	                                           int firstBlockIdx,
-	                                           int blockCount) throws CanNotPerformTransformationException {
+	                                           int blockCount,
+	                                           QName headingElement) throws CanNotPerformTransformationException {
 		doc.root();
 		nthBlock(doc, firstBlockIdx);
 		// find ancestor that contains the specified number of blocks
@@ -142,24 +143,24 @@ public class BoxTreeWalkerTest {
 				break;
 			}
 		}
-		doc.renameCurrent(H1);
+		doc.renameCurrent(headingElement);
 		// remove all strong within the heading
 		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
 		// both are related enough do perform in a single fix
-		BoxTreeWalker h1 = doc.subTree();
+		BoxTreeWalker h = doc.subTree();
 		Predicate<Box> isStrong = b -> STRONG.equals(b.getName());
-		while (h1.firstDescendant(isStrong).isPresent() || h1.firstFollowing(isStrong).isPresent())
-			if (h1.previousSibling().isPresent())
-				h1.unwrapNextSibling();
-			else if (h1.parent().isPresent())
-				h1.unwrapFirstChild();
+		while (h.firstDescendant(isStrong).isPresent() || h.firstFollowing(isStrong).isPresent())
+			if (h.previousSibling().isPresent())
+				h.unwrapNextSibling();
+			else if (h.parent().isPresent())
+				h.unwrapFirstChild();
 			else
 				throw new RuntimeException("coding error");
 		// remove all div within the heading
-		h1Walker.root();
+		h.root();
 		Predicate<Box> isDiv = b -> DIV.equals(b.getName());
-		while (h1Walker.firstDescendant(isDiv).isPresent() || h1Walker.firstFollowing(isDiv).isPresent())
-			h1Walker.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
+		while (h.firstDescendant(isDiv).isPresent() || h.firstFollowing(isDiv).isPresent())
+			h.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
 		return doc;
 	}
 
