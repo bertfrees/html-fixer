@@ -72,7 +72,6 @@ public class BoxTreeWalkerTest {
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
 		walker = transformSingleRowTable(walker, 0, 3);
-		walker.root();
 		walker = markupHeading(walker, 0, 3);
 		walker = removeImage(walker, 1, 0);
 		utils.serialize(walker.root());
@@ -87,6 +86,7 @@ public class BoxTreeWalkerTest {
 	private static BoxTreeWalker transformSingleRowTable(BoxTreeWalker doc,
 	                                                     int firstBlockIdx,
 	                                                     int blockCount) throws CanNotPerformTransformationException {
+		doc.root();
 		nthBlock(doc, firstBlockIdx);
 		while (true) {
 			assertThat(!doc.previousSibling().isPresent());
@@ -128,6 +128,7 @@ public class BoxTreeWalkerTest {
 	private static BoxTreeWalker markupHeading(BoxTreeWalker doc,
 	                                           int firstBlockIdx,
 	                                           int blockCount) throws CanNotPerformTransformationException {
+		doc.root();
 		nthBlock(doc, firstBlockIdx);
 		// find ancestor that contains the specified number of blocks
 		while (true) {
@@ -169,6 +170,7 @@ public class BoxTreeWalkerTest {
 	private static BoxTreeWalker removeImage(BoxTreeWalker doc,
 	                                         int blockIdx,
 	                                         int inlineIdx) throws CanNotPerformTransformationException {
+		doc.root();
 		nthBlock(doc, blockIdx);
 		if (inlineIdx >= 0) {
 			assertThat(inlineIdx < count(doc, b -> b.hasText() || b.isReplacedElement()));
