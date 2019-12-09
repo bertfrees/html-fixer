@@ -155,15 +155,18 @@ class BoxTreeWalker implements Cloneable {
 		int startDepth = path.size();
 		while (true) {
 			Optional<Box> next;
-			if (!((next = firstChild()).isPresent() || path.size() > startDepth && (next = nextSibling()).isPresent()))
-				while (true)
-					if ((next = parent()).isPresent()) {
-						if (path.size() == startDepth)
-							return noSuchElement;
-						if ((next = nextSibling()).isPresent())
+			if (!(next = firstChild()).isPresent())
+				if (path.size() == startDepth)
+					return noSuchElement;
+				else if (!(next = nextSibling()).isPresent())
+					while (true)
+						if ((next = parent()).isPresent()) {
+							if (path.size() == startDepth)
+								return noSuchElement;
+							if ((next = nextSibling()).isPresent())
+								break;
+						} else
 							break;
-					} else
-						break;
 			if (next.isPresent()) {
 				if (filter.test(next.get()))
 					return next;
