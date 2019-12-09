@@ -72,6 +72,8 @@ public class Serializer {
 			else
 				writer.append("\"text\":null");
 			writer.append(",");
+			writer.append("\"isReplacedElement\":").append(box.isReplacedElement() ? "true" : "false");
+			writer.append(",");
 			writer.append("\"children\":[");
 			writer.append(
 				Joiner.on(",").join(
