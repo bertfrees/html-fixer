@@ -71,7 +71,7 @@ public class BoxTreeWalkerTest {
 		URL html = BoxTreeWalkerTest.class.getResource("test.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
-		walker = transformSingleRowTable(walker, 0, 3);
+		walker = transformTable(walker, 0, 3, true);
 		walker = markupHeading(walker, 0, 3, H1);
 		walker = removeImage(walker, 1, 0);
 		utils.serialize(walker.root());
@@ -79,15 +79,29 @@ public class BoxTreeWalkerTest {
 		utils.render(walker.root(), false);
 	}
 
+	@Test
+	public void testTransformTheCodfishDreamContents()
+		throws XMLStreamException, IOException, SaxonApiException, InterruptedException,
+		       CanNotPerformTransformationException {
+
+		URL html = BoxTreeWalkerTest.class.getResource("test2.xhtml");
+		Document doc = Parser.parse(html.openStream(), html);
+		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
+		walker = transformTable(walker, 1, 150, false);
+		utils.render(walker.root(), false);
+	}
+
 	/*
 	 * @param firstBlockIdx 0-based index of first block
 	 * @param blockCount number of blocks in table row (must be at least one)
 	 */
-	private static BoxTreeWalker transformSingleRowTable(BoxTreeWalker doc,
-	                                                     int firstBlockIdx,
-	                                                     int blockCount) throws CanNotPerformTransformationException {
+	private static BoxTreeWalker transformTable(BoxTreeWalker doc,
+	                                            int firstBlockIdx,
+	                                            int blockCount,
+	                                            boolean singleRow) throws CanNotPerformTransformationException {
 		doc.root();
 		nthBlock(doc, firstBlockIdx);
+		// find and rename first cell
 		while (true) {
 			assertThat(!doc.previousSibling().isPresent());
 			if (doc.current().props.display().equals("table-cell"))
@@ -98,30 +112,48 @@ public class BoxTreeWalkerTest {
 			}
 		}
 		doc.renameCurrent(DIV);
+		// check that this is the first cell in the row
 		assertThat(!doc.previousSibling().isPresent());
-		while (true) {
-			if (doc.nextSibling().isPresent()) {
-				assertThat(doc.current().props.display().equals("table-cell"));
-				doc.renameCurrent(DIV);
-			} else
-				break;
+		//  rename other cells in this row
+		while (doc.nextSibling().isPresent()) {
+			assertThat(doc.current().props.display().equals("table-cell"));
+			doc.renameCurrent(DIV);
 		}
+		// rename row
 		assertThat(doc.parent().isPresent());
 		assertThat(doc.current().props.display().equals("table-row"));
 		doc.renameCurrent(DIV);
-		assertThat(!doc.nextSibling().isPresent());
+		// check that this is the first row in the table (or tbody)
 		assertThat(!doc.previousSibling().isPresent());
+		if (singleRow)
+			assertThat(!doc.nextSibling().isPresent());
+		else
+			// process other rows
+			while (doc.nextSibling().isPresent()) {
+				assertThat(doc.current().props.display().equals("table-row"));
+				doc.renameCurrent(DIV);
+				assertThat(doc.firstChild().isPresent());
+				doc.renameCurrent(DIV);
+				while (doc.nextSibling().isPresent()) {
+					assertThat(doc.current().props.display().equals("table-cell"));
+					doc.renameCurrent(DIV);
+				}
+				doc.parent();
+			}
 		assertThat(doc.parent().isPresent());
+		// find table
 		if (doc.current().props.display().equals("table-row-group")) {
+			// check that there is only one tbody and no thead or tfoot
 			assertThat(!doc.nextSibling().isPresent());
 			assertThat(!doc.previousSibling().isPresent());
 			assertThat(doc.parent().isPresent());
 		}
 		assertThat(doc.current().props.display().equals("table"));
+		// check number of cells in table
+		assertThat(count(doc, Box::isBlockAndHasNoBlockChildren) == blockCount);
+		// unwrap table
 		doc.firstChild();
 		doc.unwrapParent();
-		BoxTreeWalker table = doc.subTree();
-		assertThat(count(table, Box::isBlockAndHasNoBlockChildren) == blockCount);
 		return doc;
 	}
 
