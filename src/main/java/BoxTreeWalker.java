@@ -3,6 +3,7 @@ import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
 import java.util.function.Predicate;
@@ -226,7 +227,7 @@ class BoxTreeWalker implements Cloneable {
 	// attributes are copied, including style, but style does not influence box properties (-> when name is Element, not QName)
 	// returns current box (renamed, but properties unchanged)
 	public Box renameCurrent(QName name) {
-		Box renamed = current.copy(name);
+		Box renamed = current.copy(name, null);
 		updateCurrent(renamed);
 		return current;
 	}
@@ -249,7 +250,7 @@ class BoxTreeWalker implements Cloneable {
 		Box firstChild = children.next();
 		children.previous();
 		Supplier<Box> newChildren = firstChild.hasText()
-			? updateIn(children, 0, firstChild.copy((QName)null))
+			? updateIn(children, 0, firstChild.copy((QName)null, null))
 			: updateIn(children, 0, firstChild.children());
 		updateCurrent(current.copy(newChildren));
 		return current;
@@ -266,7 +267,7 @@ class BoxTreeWalker implements Cloneable {
 		Box nextSibling = siblings.next();
 		int i = rewind(siblings);
 		Supplier<Box> newSiblings = nextSibling.hasText()
-			? updateIn(siblings, i - 1, nextSibling.copy((QName)null))
+			? updateIn(siblings, i - 1, nextSibling.copy((QName)null, null))
 			: updateIn(siblings, i - 1, nextSibling.children());
 		updateCurrent(parent.copy(newSiblings));
 		firstChild();
@@ -297,45 +298,74 @@ class BoxTreeWalker implements Cloneable {
 	// null means wrap in anonymous element
 	// attributes are copied, including style, but actual style is ignored
 	// returns current box (within new parent, but properties and structure unchanged)
-	public Box wrapCurrent(Element wrapper) {
+	public Box wrapCurrent(QName wrapper) {
+		return wrapCurrent(wrapper, null);
+	}
+
+	public Box wrapCurrent(QName wrapper, Map<QName,String> attributes) {
 		throw new UnsupportedOperationException();
 	}
 
 	// null means wrap in anonymous element
+	// attributes are copied, including style, but actual style is ignored // FIXME: skip style attribute?
+	// returns current box (with different structure, but properties and visual presentation unchanged)
+	public Box wrapChildren(QName wrapper) {
+		return wrapChildren(wrapper, null);
+	}
+
+	public Box wrapChildren(QName wrapper, Map<QName,String> attributes) {
+		return wrapFirstChildren(-1, wrapper);
+	}
+
+	// null means wrap in anonymous box
+	// attributes are copied, including style, but actual style is ignored
 	// returns current box (with different structure, but properties and visual presentation unchanged)
 	public Box wrapFirstChildren(int childrenCount, QName wrapper) {
+		return wrapFirstChildren(childrenCount, wrapper, null);
+	}
+
+	public Box wrapFirstChildren(int childrenCount, QName wrapper, Map<QName,String> attributes) {
 		Box parent = current;
-		if (!firstChild().isPresent())
-			throw new RuntimeException("there are no children");
-		ListIterator<Box> children = path.peek();
+		ListIterator<Box> children;
 		List<Box> childrenToWrap = new ArrayList<>();
-		childrenToWrap.add(current);
-		for (int i = 1; i < childrenCount; i++)
-			if (!children.hasNext())
-				throw new RuntimeException("there are no " + childrenCount + " children");
-			else
-				childrenToWrap.add(children.next());
+		if (childrenCount < 0) {
+			if (firstChild().isPresent()) {
+				children = path.peek();
+				childrenToWrap.add(current);
+				while (children.hasNext())
+					childrenToWrap.add(children.next());
+			} else
+				children = Box.noChildren.iterator();
+		} else {
+			if (!firstChild().isPresent())
+				throw new RuntimeException("there are no children");
+			children = path.peek();
+			childrenToWrap.add(current);
+			for (int i = 1; i < childrenCount; i++)
+				if (!children.hasNext())
+					throw new RuntimeException("there are no " + childrenCount + " children");
+				else
+					childrenToWrap.add(children.next());
+		}
 		Box newBox = childrenToWrap.get(0) instanceof Box.BlockBox
 			? new Box.AnonymousBlockBox((Box.BlockBox)parent, _b -> childrenToWrap.iterator()::next)
 			: new Box.InlineBox(null, parent, _b -> childrenToWrap.iterator()::next);
-		if (wrapper != null)
-			newBox = newBox.copy(wrapper);
+		if (wrapper != null || attributes != null)
+			newBox = newBox.copy(wrapper, attributes);
 		rewind(children);
 		parent();
-		updateCurrent(current.copy(updateIn(children, 0, childrenCount, newBox)));
+		updateCurrent(current.copy(updateIn(children, 0, childrenToWrap.size(), newBox)));
 		return current;
 	}
 
 	// null means wrap in anonymous element
 	// attributes are copied, including style, but actual style is ignored
-	// returns current box (with different structure, but properties and visual presentation unchanged)
-	public Box wrapFirstChildren(int childrenCount, Element wrapper) {
-		throw new UnsupportedOperationException();
-	}
-
-	// null means wrap in anonymous element
 	// returns current box (with new siblings, but properties unchanged)
 	public Box wrapNextSiblings(int siblingCount, QName wrapper) {
+		return wrapNextSiblings(siblingCount, wrapper, null);
+	}
+
+	public Box wrapNextSiblings(int siblingCount, QName wrapper, Map<QName,String> attributes) {
 		if (path.empty())
 			throw new RuntimeException("there are no next siblings");
 		ListIterator<Box> siblings = path.peek();
@@ -350,19 +380,12 @@ class BoxTreeWalker implements Cloneable {
 		Box newBox = siblingsToWrap.get(0) instanceof Box.BlockBox
 			? new Box.AnonymousBlockBox((Box.BlockBox)parent, _b -> siblingsToWrap.iterator()::next)
 			: new Box.InlineBox(null, parent, _b -> siblingsToWrap.iterator()::next);
-		if (wrapper != null)
-			newBox = newBox.copy(wrapper);
+		if (wrapper != null || attributes != null)
+			newBox = newBox.copy(wrapper, attributes);
 		updateCurrent(current.copy(updateIn(siblings, first, first + siblingCount, newBox)));
 		firstChild();
 		while (first-- > 1) nextSibling();
 		return current;
-	}
-
-	// null means wrap in anonymous element
-	// attributes are copied, including style, but actual style is ignored
-	// returns current box (with new siblings, but properties unchanged)
-	public Box wrapNextSiblings(int siblingCount, Element wrapper) {
-		throw new UnsupportedOperationException();
 	}
 
 	private void updateCurrent(Box newCurrent) {

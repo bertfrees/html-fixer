@@ -38,33 +38,15 @@ public class Box implements Iterable<Box> {
 		this.replacedElement = IMG.equals(name);
 	}
 
-	private Box(Element element, Box parent, Function<Box,Supplier<Box>> children, String text, Style style) {
-		this(element != null ? element.getName() : null,
-		     element != null ? element.getAttributes() : null,
-		     parent,
-		     children,
-		     text,
-		     style);
-	}
-
 	// create copy of box but with different element name and attributes to be used for rendering it
 	// box properties and structure are not changed
-	private Box(Box box, Element newName) {
-		this.props = box.props;
-		this.children = box.children;
-		this.text = box.text;
-		this.replacedElement = box.replacedElement;
-		this.name = newName.getName();
-		this.attributes = newName.getAttributes();
-	}
-
-	private Box(Box box, QName newName) {
+	private Box(Box box, QName newName, Map<QName,String> attributes) {
 		this.props = box.props;
 		this.children = box.children;
 		this.text = box.text;
 		this.replacedElement = box.replacedElement;
 		this.name = newName;
-		this.attributes = Collections.<QName,String>emptyMap();
+		this.attributes = attributes != null ? attributes : Collections.<QName,String>emptyMap();
 	}
 
 	// create copy of box but with different children
@@ -95,8 +77,8 @@ public class Box implements Iterable<Box> {
 		}
 	}
 
-	Box copy(QName newName) {
-		return (this instanceof BlockBox) ? new BlockBox(this, newName) : new InlineBox(this, newName);
+	Box copy(QName newName, Map<QName,String> attributes) {
+		return (this instanceof BlockBox) ? new BlockBox(this, newName, attributes) : new InlineBox(this, newName, attributes);
 	}
 
 	Box copy(Supplier<Box> newChildren) {
@@ -105,50 +87,54 @@ public class Box implements Iterable<Box> {
 
 	public static class BlockBox extends Box {
 
-		private BlockBox(Element element, BlockBox parent, Function<Box,Supplier<Box>> children, String text, Style style) {
-			super(element, parent, children, text, style);
-		}
-
 		BlockBox(Element element, BlockBox parent, Function<Box,Supplier<Box>> children) {
-			super(element, parent, children, null, element.style);
+			super(element.getName(), element.getAttributes(), parent, children, null, element.style);
 		}
 
-		private BlockBox(Box box, QName newName) {
-			super(box, newName);
+		private BlockBox(Box box, QName newName, Map<QName,String> attributes) {
+			super(box, newName, attributes);
 		}
 
 		private BlockBox(Box box, Supplier<Box> newChildren) {
 			super(box, newChildren);
+		}
+
+		private BlockBox(BlockBox parent, Function<Box,Supplier<Box>> children) {
+			super(null, null, parent, children, null, new Style(Style.BLOCK, parent.props));
 		}
 	}
 
 	public static class AnonymousBlockBox extends BlockBox {
 
 		AnonymousBlockBox(BlockBox parent, Function<Box,Supplier<Box>> children) {
-			super(null, parent, children, null, new Style(Style.BLOCK, parent.props));
+			super(parent, children);
 		}
 	}
 
 	public static class InlineBox extends Box {
 
-		private InlineBox(Element element, Box parent, Function<Box,Supplier<Box>> children, String text, Style style) {
-			super(element, parent, children, text, style);
-		}
-
 		InlineBox(Element element, Box parent, Function<Box,Supplier<Box>> children) {
-			super(element, parent, children, null, element.style);
+			super(element.getName(), element.getAttributes(), parent, children, null, element.style);
 		}
 
 		InlineBox(Element element, Box parent, String text) {
-			super(element, parent, null, text, element.style);
+			super(element.getName(), element.getAttributes(), parent, null, text, element.style);
 		}
 
-		private InlineBox(Box box, QName newName) {
-			super(box, newName);
+		private InlineBox(Box box, QName newName, Map<QName,String> attributes) {
+			super(box, newName, attributes);
 		}
 
 		private InlineBox(Box box, Supplier<Box> newChildren) {
 			super(box, newChildren);
+		}
+
+		private InlineBox(Box parent, String text) {
+			super(null, null, parent, null, text, new Style(Style.INLINE, parent.props));
+		}
+
+		private InlineBox(Box parent, Function<Box,Supplier<Box>> children) {
+			super(null, null, parent, children, null, new Style(Style.INLINE, parent.props));
 		}
 
 		public String text() {
@@ -159,11 +145,11 @@ public class Box implements Iterable<Box> {
 	public static class AnonymousInlineBox extends InlineBox {
 
 		AnonymousInlineBox(Box parent, String text) {
-			super(null, parent, null, text, new Style(Style.INLINE, parent.props));
+			super(parent, text);
 		}
 
 		AnonymousInlineBox(Box parent, Function<Box,Supplier<Box>> children) {
-			super(null, parent, children, null, new Style(Style.INLINE, parent.props));
+			super(parent, children);
 		}
 	}
 
@@ -249,7 +235,7 @@ public class Box implements Iterable<Box> {
 		return !bg.equals(parentBg);
 	}
 
-	private static final ListIterable<Box> noChildren; static {
+	static final ListIterable<Box> noChildren; static {
 		ListIterator<Box> empty
 			= new MemoizingIterator<Box>(Collections.emptyList()) {
 					public Box computeNext() {

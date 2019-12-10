@@ -21,6 +21,8 @@ public class BoxTreeWalkerTest {
 	private static final QName LI = new QName(HTML_NS, "li");
 	private static final QName UL = new QName(HTML_NS, "ul");
 	private static final QName OL = new QName(HTML_NS, "ol");
+	private static final QName A = new QName(HTML_NS, "a");
+	private static final QName HREF = new QName("href");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -92,6 +94,7 @@ public class BoxTreeWalkerTest {
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
 		walker = transformTable(walker, 1, 150, false);
 		walker = convertToList(walker, 1, 150, OL);
+		walker = transformNavList(walker, 1, 150);
 		utils.render(walker.root(), false);
 	}
 
@@ -184,14 +187,7 @@ public class BoxTreeWalkerTest {
 		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
 		// both are related enough do perform in a single fix
 		BoxTreeWalker h = doc.subTree();
-		Predicate<Box> isStrong = b -> STRONG.equals(b.getName());
-		while (h.firstDescendant(isStrong).isPresent() || h.firstFollowing(isStrong).isPresent())
-			if (h.previousSibling().isPresent())
-				h.unwrapNextSibling();
-			else if (h.parent().isPresent())
-				h.unwrapFirstChild();
-			else
-				throw new RuntimeException("coding error");
+		h = unwrapAll(h, b -> STRONG.equals(b.getName()));
 		// remove all div within the heading
 		h.root();
 		Predicate<Box> isDiv = b -> DIV.equals(b.getName());
@@ -277,6 +273,61 @@ public class BoxTreeWalkerTest {
 		return doc;
 	}
 
+	/*
+	 * Transform a list so that it conforms to the navigation document spec
+	 * http://idpf.org/epub/301/spec/epub-contentdocs.html#sec-xhtml-nav
+	 *
+	 * - main list and nested lists must be "ol"
+	 * - every "li" must contain either a "a" or a "span", optionally followed by a nested "ol"
+	 *   (mandatory after "span")
+	 */
+	private static BoxTreeWalker transformNavList(BoxTreeWalker doc,
+	                                              int firstBlockIdx,
+	                                              int blockCount) throws CanNotPerformTransformationException {
+		doc.root();
+		nthBlock(doc, firstBlockIdx);
+		// find root list element
+		int listBlockCount = 1;
+		while (true) {
+			BoxTreeWalker tmp = doc.clone();
+			if (!tmp.previousSibling().isPresent()
+			    && tmp.parent().isPresent()
+			    && (listBlockCount = count(tmp, Box::isBlockAndHasNoBlockChildren)) <= blockCount) {
+				doc = tmp;
+				if (listBlockCount == blockCount && OL.equals(doc.current().getName()))
+					break;
+			} else
+				assertThat(false);
+		}
+		// process items
+		assertThat(doc.firstChild().isPresent());
+		do {
+			assertThat(LI.equals(doc.current().getName()));
+			assertThat(doc.firstChild().isPresent());
+			// wrap content in a
+			if (!A.equals(doc.current().getName()) || doc.nextSibling().isPresent()) {
+				doc.parent();
+				BoxTreeWalker li = doc.subTree();
+				// take first descendant a and move it
+				assertThat(li.firstDescendant(b -> A.equals(b.getName())).isPresent());
+				Box a = li.current();
+				String href = a.getAttributes().get(HREF);
+				assertThat(href != null);
+				// remove this a and all other a with the same href
+				li = unwrapAll(li, b -> A.equals(b.getName()) && href.equals(b.getAttributes().get(HREF)));
+				li.root();
+				li.wrapChildren(a.getName(), a.getAttributes());
+				// remove all div within the heading
+				li.root();
+				Predicate<Box> isDiv = b -> DIV.equals(b.getName());
+				while (li.firstDescendant(isDiv).isPresent() || li.firstFollowing(isDiv).isPresent())
+					li.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
+			} else
+				doc.parent();
+		} while (doc.nextSibling().isPresent());
+		return doc;
+	}
+
 	private static void nthBlock(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
 		assertThat(doc.firstDescendant(Box::isBlockAndHasNoBlockChildren).isPresent());
 		for (int i = 0; i < index; i++)
@@ -298,6 +349,32 @@ public class BoxTreeWalkerTest {
 		while (tree.firstDescendant(filter).isPresent() || tree.firstFollowing(filter).isPresent())
 			count++;
 		return count;
+	}
+
+	private static BoxTreeWalker unwrapAll(BoxTreeWalker doc, Predicate<Box> select) {
+		doc.root();
+		while (true) {
+			Box current = doc.current();
+			if (select.test(current))
+				if (doc.firstChild().isPresent()) {
+					doc.unwrapParent();
+					continue;
+				} else if (doc.previousSibling().isPresent()) {
+					doc.unwrapNextSibling();
+					if (doc.firstFollowing().isPresent())
+						continue;
+					else
+						break;
+				} else if (doc.parent().isPresent())
+					doc.unwrapFirstChild();
+				else
+					break;
+			if (doc.firstChild().isPresent() || doc.firstFollowing().isPresent())
+				continue;
+			else
+				break;
+		}
+		return doc;
 	}
 
 	private static void assertThat(boolean test) throws CanNotPerformTransformationException {
