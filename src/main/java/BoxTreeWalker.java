@@ -1,6 +1,8 @@
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Stack;
 import java.util.function.Predicate;
@@ -300,10 +302,60 @@ class BoxTreeWalker implements Cloneable {
 	}
 
 	// null means wrap in anonymous element
+	// returns current box (with different structure, but properties and visual presentation unchanged)
+	public Box wrapFirstChildren(int childrenCount, QName wrapper) {
+		Box parent = current;
+		if (!firstChild().isPresent())
+			throw new RuntimeException("there are no children");
+		ListIterator<Box> children = path.peek();
+		List<Box> childrenToWrap = new ArrayList<>();
+		childrenToWrap.add(current);
+		for (int i = 1; i < childrenCount; i++)
+			if (!children.hasNext())
+				throw new RuntimeException("there are no " + childrenCount + " children");
+			else
+				childrenToWrap.add(children.next());
+		Box newBox = childrenToWrap.get(0) instanceof Box.BlockBox
+			? new Box.AnonymousBlockBox((Box.BlockBox)parent, _b -> childrenToWrap.iterator()::next)
+			: new Box.InlineBox(null, parent, _b -> childrenToWrap.iterator()::next);
+		if (wrapper != null)
+			newBox = newBox.copy(wrapper);
+		rewind(children);
+		parent();
+		updateCurrent(current.copy(updateIn(children, 0, childrenCount, newBox)));
+		return current;
+	}
+
+	// null means wrap in anonymous element
 	// attributes are copied, including style, but actual style is ignored
 	// returns current box (with different structure, but properties and visual presentation unchanged)
 	public Box wrapFirstChildren(int childrenCount, Element wrapper) {
 		throw new UnsupportedOperationException();
+	}
+
+	// null means wrap in anonymous element
+	// returns current box (with new siblings, but properties unchanged)
+	public Box wrapNextSiblings(int siblingCount, QName wrapper) {
+		if (path.empty())
+			throw new RuntimeException("there are no next siblings");
+		ListIterator<Box> siblings = path.peek();
+		Box parent = parent().get();
+		List<Box> siblingsToWrap = new ArrayList<>();
+		for (int i = 0; i < siblingCount; i++)
+			if (!siblings.hasNext())
+				throw new RuntimeException("there are no " + siblingCount + " next siblings");
+			else
+				siblingsToWrap.add(siblings.next());
+		int first = rewind(siblings) - siblingCount;
+		Box newBox = siblingsToWrap.get(0) instanceof Box.BlockBox
+			? new Box.AnonymousBlockBox((Box.BlockBox)parent, _b -> siblingsToWrap.iterator()::next)
+			: new Box.InlineBox(null, parent, _b -> siblingsToWrap.iterator()::next);
+		if (wrapper != null)
+			newBox = newBox.copy(wrapper);
+		updateCurrent(current.copy(updateIn(siblings, first, first + siblingCount, newBox)));
+		firstChild();
+		while (first-- > 1) nextSibling();
+		return current;
 	}
 
 	// null means wrap in anonymous element
@@ -371,6 +423,20 @@ class BoxTreeWalker implements Cloneable {
 			public Box get() {
 				if (i++ == index) {
 					children.next();
+					return newChild;
+				} else
+					return children.next();
+			}
+		};
+	}
+
+	private static Supplier<Box> updateIn(Iterator<Box> children, int fromIndex, int toIndex, Box newChild) {
+		return new Supplier<Box>() {
+			int i = 0;
+			public Box get() {
+				if (i++ == fromIndex) {
+					if (fromIndex < toIndex) children.next();
+					while (i++ < toIndex) children.next();
 					return newChild;
 				} else
 					return children.next();

@@ -161,6 +161,10 @@ public class Box implements Iterable<Box> {
 		AnonymousInlineBox(Box parent, String text) {
 			super(null, parent, null, text, new Style(Style.INLINE, parent.props));
 		}
+
+		AnonymousInlineBox(Box parent, Function<Box,Supplier<Box>> children) {
+			super(null, parent, children, null, new Style(Style.INLINE, parent.props));
+		}
 	}
 
 	public ListIterator<Box> children() {

@@ -18,6 +18,9 @@ public class BoxTreeWalkerTest {
 	private static final QName H1 = new QName(HTML_NS, "h1");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
 	private static final QName IMG = new QName(HTML_NS, "img");
+	private static final QName LI = new QName(HTML_NS, "li");
+	private static final QName UL = new QName(HTML_NS, "ul");
+	private static final QName OL = new QName(HTML_NS, "ol");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -88,6 +91,7 @@ public class BoxTreeWalkerTest {
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
 		walker = transformTable(walker, 1, 150, false);
+		walker = convertToList(walker, 1, 150, OL);
 		utils.render(walker.root(), false);
 	}
 
@@ -217,6 +221,58 @@ public class BoxTreeWalkerTest {
 		       && !doc.nextSibling().isPresent()
 		       && doc.parent().isPresent()) {
 			doc.renameCurrent(_SPAN);
+		}
+		return doc;
+	}
+
+	private static BoxTreeWalker convertToList(BoxTreeWalker doc,
+	                                           int firstBlockIdx,
+	                                           int blockCount,
+	                                           QName listElement) throws CanNotPerformTransformationException {
+		doc.root();
+		nthBlock(doc, firstBlockIdx);
+		// find first list item
+		int itemBlockCount = 1;
+		boolean firstItemHasPreviousSibling = false;
+		while (true) {
+			BoxTreeWalker tmp = doc.clone();
+			int k;
+			if (tmp.previousSibling().isPresent()) {
+				firstItemHasPreviousSibling = true;
+				break;
+			}
+			if (tmp.parent().isPresent() && (k = count(tmp, Box::isBlockAndHasNoBlockChildren)) < blockCount) {
+				doc = tmp;
+				itemBlockCount = k;
+			} else
+				break;
+		}
+		blockCount -= itemBlockCount;
+		// rename list item
+		doc.renameCurrent(LI);
+		// rename other list items
+		int itemCount = 1;
+		while (blockCount > 0) {
+			assertThat(doc.nextSibling().isPresent());
+			doc.renameCurrent(LI);
+			blockCount -= count(doc, Box::isBlockAndHasNoBlockChildren);
+			itemCount++;
+		}
+		assertThat(blockCount == 0);
+		boolean lastItemHasNextSibling = doc.nextSibling().isPresent();
+		// rename parent element to ul, or wrap inside new ul element if parent element contains more than the list items only
+		if (!firstItemHasPreviousSibling && !lastItemHasNextSibling) {
+			doc.parent();
+			doc.renameCurrent(listElement);
+		} else {
+			if (lastItemHasNextSibling) doc.previousSibling();
+			for (int k = itemCount; k > 1; k--) doc.previousSibling();
+			if (doc.previousSibling().isPresent())
+				doc.wrapNextSiblings(itemCount, listElement);
+			else {
+				doc.parent();
+				doc.wrapFirstChildren(itemCount, listElement);
+			}
 		}
 		return doc;
 	}
