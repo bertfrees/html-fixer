@@ -170,20 +170,9 @@ public class BoxTreeWalkerTest {
 	                                           int firstBlockIdx,
 	                                           int blockCount,
 	                                           QName headingElement) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, firstBlockIdx);
-		// find ancestor that contains the specified number of blocks
-		while (true) {
-			BoxTreeWalker tmp = doc.clone();
-			if (!tmp.previousSibling().isPresent()
-			    && tmp.parent().isPresent()
-			    && count(tmp, Box::isBlockAndHasNoBlockChildren) <= blockCount) {
-				doc = tmp;
-			} else {
-				assertThat(count(doc, Box::isBlockAndHasNoBlockChildren) == blockCount);
-				break;
-			}
-		}
+		// find ancestor that contains the specified number of blocks, or create it
+		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
+		// rename to heading
 		doc.renameCurrent(headingElement);
 		// remove all strong within the heading
 		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
@@ -227,51 +216,19 @@ public class BoxTreeWalkerTest {
 	                                           int firstBlockIdx,
 	                                           int blockCount,
 	                                           QName listElement) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, firstBlockIdx);
-		// find first list item
-		int itemBlockCount = 1;
-		boolean firstItemHasPreviousSibling = false;
-		while (true) {
-			BoxTreeWalker tmp = doc.clone();
-			int k;
-			if (tmp.previousSibling().isPresent()) {
-				firstItemHasPreviousSibling = true;
-				break;
-			}
-			if (tmp.parent().isPresent() && (k = count(tmp, Box::isBlockAndHasNoBlockChildren)) < blockCount) {
-				doc = tmp;
-				itemBlockCount = k;
-			} else
-				break;
-		}
-		blockCount -= itemBlockCount;
-		// rename list item
-		doc.renameCurrent(LI);
-		// rename other list items
-		int itemCount = 1;
-		while (blockCount > 0) {
-			assertThat(doc.nextSibling().isPresent());
-			doc.renameCurrent(LI);
-			blockCount -= count(doc, Box::isBlockAndHasNoBlockChildren);
-			itemCount++;
-		}
-		assertThat(blockCount == 0);
-		boolean lastItemHasNextSibling = doc.nextSibling().isPresent();
-		// rename parent element to ul, or wrap inside new ul element if parent element contains more than the list items only
-		if (!firstItemHasPreviousSibling && !lastItemHasNextSibling) {
-			doc.parent();
+		// find ancestor that contains the specified number of blocks, or create it
+		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
+		// rename to list or wrap with new list element
+		if (doc.current().isBlockAndHasNoBlockChildren())
+			doc.wrapCurrent(listElement);
+		else {
 			doc.renameCurrent(listElement);
-		} else {
-			if (lastItemHasNextSibling) doc.previousSibling();
-			for (int k = itemCount; k > 1; k--) doc.previousSibling();
-			if (doc.previousSibling().isPresent())
-				doc.wrapNextSiblings(itemCount, listElement);
-			else {
-				doc.parent();
-				doc.wrapFirstChildren(itemCount, listElement);
-			}
+			doc.firstChild();
 		}
+		// rename list items
+		do {
+			doc.renameCurrent(LI);
+		} while (doc.nextSibling().isPresent());
 		return doc;
 	}
 
@@ -431,6 +388,53 @@ public class BoxTreeWalkerTest {
 				continue;
 			else
 				break;
+		}
+		return doc;
+	}
+
+	/* Manipulate the tree so that on return current box contains exactly the specified blocks. If
+	 * needed, insert a new anonymous box. */
+	private static BoxTreeWalker wrapIfNeeded(BoxTreeWalker doc,
+	                                          int firstBlockIdx,
+	                                          int blockCount) throws CanNotPerformTransformationException {
+		doc.root();
+		nthBlock(doc, firstBlockIdx);
+		// find box that contains exactly the specified blocks, or if it doesn't exist find the first child box
+		int firstBoxBlockCount = 1;
+		while (true) {
+			BoxTreeWalker tmp = doc.clone();
+			if (tmp.previousSibling().isPresent())
+				break;
+			if (tmp.parent().isPresent()) {
+				int k = count(tmp, Box::isBlockAndHasNoBlockChildren);
+				if (k <= blockCount) {
+					doc = tmp;
+					firstBoxBlockCount = k;
+				} else
+					break;
+			} else
+					break;
+		}
+		if (blockCount == firstBoxBlockCount)
+			return doc;
+		blockCount -= firstBoxBlockCount;
+		// find other child boxes
+		int boxCount = 1;
+		while (blockCount > 0) {
+			assertThat(doc.nextSibling().isPresent());
+			blockCount -= count(doc, Box::isBlockAndHasNoBlockChildren);
+			boxCount++;
+		}
+		assertThat(blockCount == 0);
+		for (int k = boxCount; k > 1; k--) doc.previousSibling();
+		// wrap inside anonymous box
+		if (doc.previousSibling().isPresent()) {
+			doc.wrapNextSiblings(boxCount, null);
+			doc.nextSibling();
+		} else {
+			doc.parent();
+			doc.wrapFirstChildren(boxCount, null);
+			doc.firstChild();
 		}
 		return doc;
 	}

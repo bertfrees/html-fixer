@@ -1,5 +1,6 @@
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
@@ -303,7 +304,15 @@ class BoxTreeWalker implements Cloneable {
 	}
 
 	public Box wrapCurrent(QName wrapper, Map<QName,String> attributes) {
-		throw new UnsupportedOperationException();
+		Box parent = clone().parent().orElse(null);
+		Box newBox = current instanceof Box.BlockBox
+			? new Box.AnonymousBlockBox((Box.BlockBox)parent, _b -> Collections.singleton(current).iterator()::next)
+			: new Box.InlineBox(null, parent, _b -> Collections.singleton(current).iterator()::next);
+		if (wrapper != null || attributes != null)
+			newBox = newBox.copy(wrapper, attributes);
+		updateCurrent(newBox);
+		firstChild();
+		return current;
 	}
 
 	// null means wrap in anonymous element
