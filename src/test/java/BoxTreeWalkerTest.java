@@ -23,6 +23,7 @@ public class BoxTreeWalkerTest {
 	private static final QName OL = new QName(HTML_NS, "ol");
 	private static final QName A = new QName(HTML_NS, "a");
 	private static final QName HREF = new QName("href");
+	private static final QName NAV = new QName(HTML_NS, "nav");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -95,6 +96,7 @@ public class BoxTreeWalkerTest {
 		walker = transformTable(walker, 1, 150, false);
 		walker = convertToList(walker, 1, 150, OL);
 		walker = transformNavList(walker, 1, 150);
+		walker = wrapList(walker, 0, 151, 1, NAV);
 		utils.render(walker.root(), false);
 	}
 
@@ -325,6 +327,62 @@ public class BoxTreeWalkerTest {
 			} else
 				doc.parent();
 		} while (doc.nextSibling().isPresent());
+		return doc;
+	}
+
+	/*
+	 * Wrap a list together with some pre-content
+	 *
+	 * @param preContentBlockCount may be 0
+	 */
+	private static BoxTreeWalker wrapList(BoxTreeWalker doc,
+	                                      int firstBlockIdx,
+	                                      int blockCount,
+	                                      int preContentBlockCount,
+	                                      QName wrapper) throws CanNotPerformTransformationException {
+		doc.root();
+		nthBlock(doc, firstBlockIdx + preContentBlockCount);
+		// find list element
+		int listBlockCount = 1;
+		while (true) {
+			BoxTreeWalker tmp = doc.clone();
+			if (!tmp.previousSibling().isPresent()
+			    && tmp.parent().isPresent()
+			    && (listBlockCount = count(tmp, Box::isBlockAndHasNoBlockChildren)) <= (blockCount - preContentBlockCount)) {
+				doc = tmp;
+				if (listBlockCount == (blockCount - preContentBlockCount)
+				    && (OL.equals(doc.current().getName()) || UL.equals(doc.current().getName())))
+					break;
+			} else
+				assertThat(false);
+		}
+		boolean listHasNextSibling = doc.nextSibling().isPresent();
+		if (listHasNextSibling)
+			doc.previousSibling();
+		// find elements belonging to pre-content
+		int childrenCount = 1;
+		if (preContentBlockCount > 0) {
+			while (doc.previousSibling().isPresent()) {
+				childrenCount++;
+				preContentBlockCount -= count(doc, Box::isBlockAndHasNoBlockChildren);
+				if (preContentBlockCount <= 0) break;
+			}
+			assertThat(preContentBlockCount == 0);
+		}
+		boolean preContentHasPreviousSibling = doc.previousSibling().isPresent();
+		if (preContentHasPreviousSibling)
+			doc.wrapNextSiblings(childrenCount, wrapper);
+		else if (listHasNextSibling) {
+			doc.parent();
+			doc.wrapFirstChildren(childrenCount, wrapper);
+		} else {
+			assertThat(doc.parent().isPresent());
+			if (!wrapper.equals(doc.current().getName()))
+				if (DIV.equals(doc.current().getName()))
+					doc.renameCurrent(wrapper);
+				else
+					doc.wrapChildren(wrapper);
+		}
 		return doc;
 	}
 
