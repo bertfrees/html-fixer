@@ -14,6 +14,7 @@ public class BoxTreeWalkerTest {
 
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 	private static final QName DIV = new QName(HTML_NS, "div");
+	private static final QName P = new QName(HTML_NS, "p");
 	private static final QName _SPAN = new QName(HTML_NS, "_span");
 	private static final QName H1 = new QName(HTML_NS, "h1");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
@@ -179,10 +180,10 @@ public class BoxTreeWalkerTest {
 		// both are related enough do perform in a single fix
 		BoxTreeWalker h = doc.subTree();
 		h = unwrapAll(h, b -> STRONG.equals(b.getName()));
-		// remove all div within the heading
+		// remove all div and p within the heading
 		h.root();
-		Predicate<Box> isDiv = b -> DIV.equals(b.getName());
-		while (h.firstDescendant(isDiv).isPresent() || h.firstFollowing(isDiv).isPresent())
+		Predicate<Box> isDivOrP = b -> DIV.equals(b.getName()) || P.equals(b.getName());
+		while (h.firstDescendant(isDivOrP).isPresent() || h.firstFollowing(isDivOrP).isPresent())
 			h.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
 		return doc;
 	}
@@ -276,10 +277,10 @@ public class BoxTreeWalkerTest {
 				li = unwrapAll(li, b -> A.equals(b.getName()) && href.equals(b.getAttributes().get(HREF)));
 				li.root();
 				li.wrapChildren(a.getName(), a.getAttributes());
-				// remove all div within the heading
+				// remove all div and p within the heading
 				li.root();
-				Predicate<Box> isDiv = b -> DIV.equals(b.getName());
-				while (li.firstDescendant(isDiv).isPresent() || li.firstFollowing(isDiv).isPresent())
+				Predicate<Box> isDivOrP = b -> DIV.equals(b.getName()) || P.equals(b.getName());
+				while (li.firstDescendant(isDivOrP).isPresent() || li.firstFollowing(isDivOrP).isPresent())
 					li.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
 			} else
 				doc.parent();
