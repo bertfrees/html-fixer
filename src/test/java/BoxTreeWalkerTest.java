@@ -25,6 +25,8 @@ public class BoxTreeWalkerTest {
 	private static final QName A = new QName(HTML_NS, "a");
 	private static final QName HREF = new QName("href");
 	private static final QName NAV = new QName(HTML_NS, "nav");
+	private static final QName FIGURE = new QName(HTML_NS, "figure");
+	private static final QName FIGCAPTION = new QName(HTML_NS, "figcaption");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -341,6 +343,34 @@ public class BoxTreeWalkerTest {
 				else
 					doc.wrapChildren(wrapper);
 		}
+		return doc;
+	}
+
+	/*
+	 * @param captionBlockCount may be 0
+	 */
+	private static BoxTreeWalker wrapInFigure(BoxTreeWalker doc,
+	                                          int firstBlockIdx,
+	                                          int blockCount,
+	                                          int captionBlockCount,
+	                                          boolean captionBefore) throws CanNotPerformTransformationException {
+		if (captionBlockCount > 0) {
+			doc = wrapIfNeeded(doc,
+			                   captionBefore
+			                       ? firstBlockIdx
+			                       : firstBlockIdx + blockCount - captionBlockCount,
+			                   captionBlockCount);
+			doc.renameCurrent(FIGCAPTION);
+		}
+		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
+		doc.renameCurrent(FIGURE);
+		if (blockCount - captionBlockCount == 1 && captionBlockCount != 0) {
+			doc.firstChild();
+			doc.nextSibling();
+			if (DIV.equals(doc.current().getName()) || P.equals(doc.current().getName()))
+				doc.renameCurrent(_SPAN);
+		}
+		return doc;
 		return doc;
 	}
 
