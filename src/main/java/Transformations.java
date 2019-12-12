@@ -313,6 +313,27 @@ public final class Transformations {
 		return doc;
 	}
 
+	public static BoxTreeWalker removeHiddenBox(BoxTreeWalker doc,
+	                                            int blockIdx) throws CanNotPerformTransformationException {
+		doc.root();
+		nthBlock(doc, blockIdx);
+		assertThat("hidden".equals(doc.current().props.visibility()));
+		// check that all contained boxes inherit visibility
+		BoxTreeWalker box = doc.subTree();
+		while (box.firstChild().isPresent() || box.firstFollowing().isPresent())
+			assertThat("hidden".equals(box.current().props.visibility()));
+		// remove
+		doc.markCurrentForRemoval();
+		// also remove parent elements that have no other content than the current box and are also hidden
+		while (!doc.previousSibling().isPresent()
+		       && !doc.nextSibling().isPresent()
+		       && doc.parent().isPresent()
+		       && "hidden".equals(doc.current().props.visibility())) {
+			doc.markCurrentForRemoval();
+		}
+		return doc;
+	}
+
 	/*
 	 * Remove all the em from this box if all text boxes in this box are a descendant of em.
 	 *

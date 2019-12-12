@@ -5,6 +5,7 @@ import cz.vutbr.web.css.CSSProperty;
 import cz.vutbr.web.css.CSSProperty.BackgroundColor;
 import cz.vutbr.web.css.CSSProperty.Display;
 import cz.vutbr.web.css.CSSProperty.Margin;
+import cz.vutbr.web.css.CSSProperty.Visibility;
 import cz.vutbr.web.css.TermColor;
 import cz.vutbr.web.css.TermLengthOrPercent;
 
@@ -25,6 +26,8 @@ public class BoxPropertiesImpl extends Style implements BoxProperties {
 			return display();
 		else if ("background-color".equals(prop))
 			return backgroundColor();
+		else if ("visibility".equals(prop))
+			return visibility();
 		else if ("top".equals(prop))
 			return top();
 		else if ("right".equals(prop))
@@ -67,6 +70,23 @@ public class BoxPropertiesImpl extends Style implements BoxProperties {
 			}
 		}
 		return backgroundColor;
+	}
+
+	private String visibility = null;
+	public String visibility() {
+		if (visibility == null) {
+			Property<Visibility> p = getSpecifiedProperty("visibility", Visibility.class);
+			switch (p.prop) {
+			case COLLAPSE:
+			case HIDDEN:
+				return "hidden";
+			case VISIBLE:
+				return "visible";
+			default:
+				throw new RuntimeException("coding error");
+			}
+		}
+		return visibility;
 	}
 
 	public int top() {
