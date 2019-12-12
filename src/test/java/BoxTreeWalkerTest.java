@@ -20,6 +20,8 @@ public class BoxTreeWalkerTest {
 	private static final QName _SPAN = new QName(HTML_NS, "_span");
 	private static final QName H1 = new QName(HTML_NS, "h1");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
+	private static final QName EM = new QName(HTML_NS, "em");
+	private static final QName SMALL = new QName(HTML_NS, "small");
 	private static final QName IMG = new QName(HTML_NS, "img");
 	private static final QName LI = new QName(HTML_NS, "li");
 	private static final QName UL = new QName(HTML_NS, "ul");
@@ -179,8 +181,10 @@ public class BoxTreeWalkerTest {
 		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
 		// rename to heading
 		doc.renameCurrent(headingElement);
-		// remove all strong within the heading
-		doc = removeStrongInAllStrongBox(doc);
+		// remove strong, em and small within the heading
+		doc = removeEmInAllEmBox(doc, STRONG);
+		doc = removeEmInAllEmBox(doc, EM);
+		doc = removeEmInAllEmBox(doc, SMALL);
 		// remove all div and p within the heading
 		// remove all span within the heading
 		BoxTreeWalker h = doc.subTree();
@@ -361,7 +365,9 @@ public class BoxTreeWalkerTest {
 			                       : firstBlockIdx + blockCount - captionBlockCount,
 			                   captionBlockCount);
 			doc.renameCurrent(FIGCAPTION);
-			doc = removeStrongInAllStrongBox(doc);
+			doc = removeEmInAllEmBox(doc, STRONG);
+			doc = removeEmInAllEmBox(doc, EM);
+			doc = removeEmInAllEmBox(doc, SMALL);
 		}
 		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
 		doc.renameCurrent(FIGURE);
@@ -375,13 +381,16 @@ public class BoxTreeWalkerTest {
 	}
 
 	/*
-	 * Remove all the strong from this box if all text boxes in this box are a descendant of strong.
+	 * Remove all the em from this box if all text boxes in this box are a descendant of em.
+	 *
+	 * Can also be used for strong, small etc. instead of em.
 	 */
-	private static BoxTreeWalker removeStrongInAllStrongBox(BoxTreeWalker doc) {
+	private static BoxTreeWalker removeEmInAllEmBox(BoxTreeWalker doc,
+	                                                QName emElement) {
 		BoxTreeWalker box = doc.subTree();
 		boolean allStrong = true;
 		while (true) {
-			if (!STRONG.equals(box.current().getName())) {
+			if (!emElement.equals(box.current().getName())) {
 				if (box.current().hasText()
 				    && !WHITE_SPACE.matcher(((Box.InlineBox)box.current()).text()).matches()) {
 					allStrong = false;
@@ -396,7 +405,7 @@ public class BoxTreeWalkerTest {
 		}
 		if (allStrong) {
 			box.root();
-			unwrapAll(box, x -> STRONG.equals(x.getName()));
+			unwrapAll(box, x -> emElement.equals(x.getName()));
 		}
 		return doc;
 	}
