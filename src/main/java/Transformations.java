@@ -27,6 +27,7 @@ public final class Transformations {
 	private static final QName FIGCAPTION = new QName(HTML_NS, "figcaption");
 
 	private static final Map<QName,String> EPUB_TYPE_Z3998_POEM = ImmutableMap.of(new QName(EPUB_NS, "type"), "z3998:poem");
+	private static final Map<QName,String> EPUB_TYPE_PAGEBREAK = ImmutableMap.of(new QName(EPUB_NS, "type"), "pagebreak");
 
 	/*
 	 * @param firstBlockIdx 0-based index of first block
@@ -331,6 +332,14 @@ public final class Transformations {
 		       && "hidden".equals(doc.current().props.visibility())) {
 			doc.markCurrentForRemoval();
 		}
+		return doc;
+	}
+
+	public static BoxTreeWalker markupPageBreak(BoxTreeWalker doc,
+	                                            int blockIdx) throws CanNotPerformTransformationException {
+		doc.root();
+		nthBlock(doc, blockIdx);
+		doc.renameCurrent(DIV, EPUB_TYPE_PAGEBREAK);
 		return doc;
 	}
 
