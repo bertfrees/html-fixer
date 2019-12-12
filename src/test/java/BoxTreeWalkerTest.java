@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLStreamException;
@@ -178,12 +179,9 @@ public class BoxTreeWalkerTest {
 		// rename to heading
 		doc.renameCurrent(headingElement);
 		// remove all strong within the heading
-		// note that this could be done in a separate fix, but it would impose an order in which the fixes need to be applied
-		// both are related enough do perform in a single fix
-		BoxTreeWalker h = doc.subTree();
-		h = unwrapAll(h, b -> STRONG.equals(b.getName()));
+		doc = removeStrongInAllStrongBox(doc);
 		// remove all div and p within the heading
-		h.root();
+		BoxTreeWalker h = doc.subTree();
 		Predicate<Box> isDivOrP = b -> DIV.equals(b.getName()) || P.equals(b.getName());
 		while (h.firstDescendant(isDivOrP).isPresent() || h.firstFollowing(isDivOrP).isPresent())
 			h.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
@@ -361,6 +359,7 @@ public class BoxTreeWalkerTest {
 			                       : firstBlockIdx + blockCount - captionBlockCount,
 			                   captionBlockCount);
 			doc.renameCurrent(FIGCAPTION);
+			doc = removeStrongInAllStrongBox(doc);
 		}
 		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
 		doc.renameCurrent(FIGURE);
@@ -371,8 +370,36 @@ public class BoxTreeWalkerTest {
 				doc.renameCurrent(_SPAN);
 		}
 		return doc;
+	}
+
+	/*
+	 * Remove all the strong from this box if all text boxes in this box are a descendant of strong.
+	 */
+	private static BoxTreeWalker removeStrongInAllStrongBox(BoxTreeWalker doc) {
+		BoxTreeWalker box = doc.subTree();
+		boolean allStrong = true;
+		while (true) {
+			if (!STRONG.equals(box.current().getName())) {
+				if (box.current().hasText()
+				    && !WHITE_SPACE.matcher(((Box.InlineBox)box.current()).text()).matches()) {
+					allStrong = false;
+					break;
+				}
+				if (box.firstChild().isPresent())
+					continue;
+			}
+			if (box.firstFollowing().isPresent())
+				continue;
+			break;
+		}
+		if (allStrong) {
+			box.root();
+			unwrapAll(box, x -> STRONG.equals(x.getName()));
+		}
 		return doc;
 	}
+
+	private static final Pattern WHITE_SPACE = Pattern.compile("\\s*");
 
 	private static void nthBlock(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
 		assertThat(doc.firstDescendant(Box::isBlockAndHasNoBlockChildren).isPresent());
