@@ -228,7 +228,11 @@ class BoxTreeWalker implements Cloneable {
 	// attributes are copied, including style, but style does not influence box properties (-> when name is Element, not QName)
 	// returns current box (renamed, but properties unchanged)
 	public Box renameCurrent(QName name) {
-		Box renamed = current.copy(name, null);
+		return renameCurrent(name, null);
+	}
+
+	public Box renameCurrent(QName name, Map<QName,String> attributes) {
+		Box renamed = current.copy(name, attributes);
 		updateCurrent(renamed);
 		return current;
 	}

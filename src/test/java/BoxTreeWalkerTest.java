@@ -1,11 +1,14 @@
 import java.io.IOException;
 import java.net.URL;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLStreamException;
+
+import com.google.common.collect.ImmutableMap;
 
 import net.sf.saxon.s9api.SaxonApiException;
 
@@ -14,6 +17,7 @@ import org.junit.Test;
 public class BoxTreeWalkerTest {
 
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
+	private static final String EPUB_NS = "http://www.idpf.org/2007/ops";
 	private static final QName DIV = new QName(HTML_NS, "div");
 	private static final QName P = new QName(HTML_NS, "p");
 	private static final QName SPAN = new QName(HTML_NS, "span");
@@ -31,6 +35,7 @@ public class BoxTreeWalkerTest {
 	private static final QName NAV = new QName(HTML_NS, "nav");
 	private static final QName FIGURE = new QName(HTML_NS, "figure");
 	private static final QName FIGCAPTION = new QName(HTML_NS, "figcaption");
+	private static final Map<QName,String> EPUB_TYPE_Z3998_POEM = ImmutableMap.of(new QName(EPUB_NS, "type"), "z3998:poem");
 
 	@Test
 	public void testRename() throws XMLStreamException, IOException, SaxonApiException, InterruptedException {
@@ -101,7 +106,7 @@ public class BoxTreeWalkerTest {
 		Document doc = Parser.parse(html.openStream(), html);
 		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
 		walker = transformTable(walker, 1, 150, false);
-		walker = convertToList(walker, 1, 150, OL);
+		walker = convertToList(walker, 1, 150, OL, null, LI);
 		walker = transformNavList(walker, 1, 150);
 		walker = wrapList(walker, 0, 151, 1, NAV);
 		utils.render(walker.root(), false);
@@ -222,21 +227,29 @@ public class BoxTreeWalkerTest {
 	private static BoxTreeWalker convertToList(BoxTreeWalker doc,
 	                                           int firstBlockIdx,
 	                                           int blockCount,
-	                                           QName listElement) throws CanNotPerformTransformationException {
+	                                           QName listElement,
+	                                           Map<QName,String> listAttributes,
+	                                           QName listItemElement) throws CanNotPerformTransformationException {
 		// find ancestor that contains the specified number of blocks, or create it
 		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
 		// rename to list or wrap with new list element
 		if (doc.current().isBlockAndHasNoBlockChildren())
-			doc.wrapCurrent(listElement);
+			doc.wrapCurrent(listElement, listAttributes);
 		else {
-			doc.renameCurrent(listElement);
+			doc.renameCurrent(listElement, listAttributes);
 			doc.firstChild();
 		}
 		// rename list items
 		do {
-			doc.renameCurrent(LI);
+			doc.renameCurrent(listItemElement);
 		} while (doc.nextSibling().isPresent());
 		return doc;
+	}
+
+	private static BoxTreeWalker convertToPoem(BoxTreeWalker doc,
+	                                           int firstBlockIdx,
+	                                           int blockCount) throws CanNotPerformTransformationException {
+		return convertToList(doc, firstBlockIdx, blockCount, DIV, EPUB_TYPE_Z3998_POEM, P);
 	}
 
 	/*
