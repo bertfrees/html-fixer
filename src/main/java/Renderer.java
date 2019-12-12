@@ -49,11 +49,13 @@ public class Renderer {
 	                              BoxProperties parentBox,
 	                              boolean renderingWillStartNewBlock,
 	                              boolean preserveStyle) throws XMLStreamException {
+		if (box.rendering == Box.Rendering.SKIP)
+			return renderingWillStartNewBlock;
 		String styleAttr = null;
 		if (preserveStyle)
 			styleAttr = serializeCascadedProperties(((BoxPropertiesImpl)box.props()).relativize((BoxPropertiesImpl)parentBox));
 		boolean skippedStartElement = false;
-		if (box.isAnonymous() || box.getName().getLocalPart().startsWith("_")) {
+		if (box.isAnonymous() || box.rendering == Box.Rendering.ANONYMOUS) {
 			if (styleAttr == null) {
 				if (!(box instanceof Box.BlockBox && !renderingWillStartNewBlock))
 					skippedStartElement = true;
@@ -72,9 +74,7 @@ public class Renderer {
 				QName name = box.getName();
 				XMLStreamWriterHelper.writeStartElement(
 					writer,
-					name != null ? new QName(name.getNamespaceURI(),
-					                         name.getLocalPart().substring(1),
-					                         name.getPrefix())
+					name != null ? name
 					             : box instanceof Box.BlockBox ? DIV : SPAN);
 				if (box instanceof Box.BlockBox)
 					renderingWillStartNewBlock = true;
@@ -102,7 +102,9 @@ public class Renderer {
 	}
 
 	private static boolean willRender(Box box, BoxProperties parentBox, boolean preserveStyle) throws XMLStreamException {
-		if (!box.isAnonymous() && !box.getName().getLocalPart().startsWith("_"))
+		if (box.rendering == Box.Rendering.SKIP)
+			return false;
+		if (!box.isAnonymous() && box.rendering != Box.Rendering.ANONYMOUS)
 			return true;
 		if (box.hasText())
 			return true;

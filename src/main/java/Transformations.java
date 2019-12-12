@@ -14,7 +14,6 @@ public final class Transformations {
 	private static final QName DIV = new QName(HTML_NS, "div");
 	private static final QName P = new QName(HTML_NS, "p");
 	private static final QName SPAN = new QName(HTML_NS, "span");
-	private static final QName _SPAN = new QName(HTML_NS, "_span");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
 	private static final QName EM = new QName(HTML_NS, "em");
 	private static final QName SMALL = new QName(HTML_NS, "small");
@@ -111,8 +110,11 @@ public final class Transformations {
 		// remove all span within the heading
 		BoxTreeWalker h = doc.subTree();
 		Predicate<Box> isDivOrPOrSpan = b -> DIV.equals(b.getName()) || P.equals(b.getName()) || SPAN.equals(b.getName());
-		while (h.firstDescendant(isDivOrPOrSpan).isPresent() || h.firstFollowing(isDivOrPOrSpan).isPresent())
-			h.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
+		while (h.firstDescendant(isDivOrPOrSpan).isPresent() || h.firstFollowing(isDivOrPOrSpan).isPresent()) {
+			if (!SPAN.equals(h.current().getName()))
+				h.renameCurrent(SPAN);
+			h.markCurrentForUnwrap();
+		}
 		return doc;
 	}
 
@@ -131,13 +133,12 @@ public final class Transformations {
 		}
 		assertThat(IMG.equals(doc.current().getName()));
 		assertThat(doc.current().isReplacedElement());
-		doc.renameCurrent(_SPAN);
+		doc.markCurrentForRemoval();
 		// also remove parent elements that have no other content than the img
 		while (!doc.previousSibling().isPresent()
 		       && !doc.nextSibling().isPresent()
-		       && doc.parent().isPresent()) {
-			doc.renameCurrent(_SPAN);
-		}
+		       && doc.parent().isPresent())
+			doc.markCurrentForRemoval();
 		return doc;
 	}
 
@@ -216,8 +217,10 @@ public final class Transformations {
 				// remove all div and p within the heading
 				li.root();
 				Predicate<Box> isDivOrP = b -> DIV.equals(b.getName()) || P.equals(b.getName());
-				while (li.firstDescendant(isDivOrP).isPresent() || li.firstFollowing(isDivOrP).isPresent())
-					li.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
+				while (li.firstDescendant(isDivOrP).isPresent() || li.firstFollowing(isDivOrP).isPresent()) {
+					li.renameCurrent(SPAN);
+					li.markCurrentForUnwrap();
+				}
 			} else
 				doc.parent();
 		} while (doc.nextSibling().isPresent());
@@ -305,7 +308,7 @@ public final class Transformations {
 			doc.firstChild();
 			doc.nextSibling();
 			if (DIV.equals(doc.current().getName()) || P.equals(doc.current().getName()))
-				doc.renameCurrent(_SPAN);
+				doc.markCurrentForUnwrap();
 		}
 		return doc;
 	}

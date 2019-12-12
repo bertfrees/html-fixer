@@ -12,6 +12,18 @@ import com.google.common.collect.ImmutableSet;
 
 public class Box implements Iterable<Box> {
 
+	public enum Rendering {
+		// render as an element with name `getName()` and attributes `getAttributes()`, or as
+		// ANONYMOUS if isAnonymous() is true
+		DEFAULT,
+		// if possible only render the contents (if preserveStyle option allows it and block
+		// structure can be preserved), or otherwise render as an element with name `getName()`, or
+		// with name "span" or "div" if isAnonymous() is true
+		ANONYMOUS,
+		// don't render
+		SKIP
+	}
+
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 	private static final QName IMG = new QName(HTML_NS, "img");
 
@@ -21,13 +33,20 @@ public class Box implements Iterable<Box> {
 	protected final String text;
 	protected final BoxPropertiesImpl props;
 	protected final boolean replacedElement;
+	final Rendering rendering;
 
 	// parent is the original parent box in the original box tree
 	// it is only used for determining the box properties
 	// it is not used for navigating to the parent box in the current tree (which may be different
 	// than the original)
 	// children is a function that is only called once, with this object as argument
-	private Box(QName name, Map<QName,String> attributes, Box parent, Function<Box,Supplier<Box>> children, String text, Style style) {
+	private Box(QName name,
+	            Map<QName,String> attributes,
+	            Box parent,
+	            Function<Box,Supplier<Box>> children,
+	            String text,
+	            Style style,
+	            Rendering rendering) {
 		this.name = name;
 		this.attributes = attributes != null ? attributes : Collections.<QName,String>emptyMap();
 		this.props = new BoxPropertiesImpl(style, parent != null ? parent.props : null);
@@ -36,6 +55,7 @@ public class Box implements Iterable<Box> {
 			: noChildren;
 		this.text = text;
 		this.replacedElement = IMG.equals(name);
+		this.rendering = rendering != null ? rendering : Rendering.DEFAULT;
 	}
 
 	// create copy of box but with different element name and attributes to be used for rendering it
@@ -45,6 +65,7 @@ public class Box implements Iterable<Box> {
 		this.children = box.children;
 		this.text = box.text;
 		this.replacedElement = box.replacedElement;
+		this.rendering = box.rendering;
 		this.name = newName;
 		this.attributes = attributes != null ? attributes : Collections.<QName,String>emptyMap();
 	}
@@ -56,6 +77,7 @@ public class Box implements Iterable<Box> {
 		this.props = box.props;
 		this.text = box.text;
 		this.replacedElement = box.replacedElement;
+		this.rendering = box.rendering;
 		this.children = MemoizingIterator.iterable(newChildren);
 		if (this instanceof BlockBox) {
 			Boolean hasBlockChildren = null;
@@ -77,6 +99,17 @@ public class Box implements Iterable<Box> {
 		}
 	}
 
+	// create copy of box but with different rendering
+	private Box(Box box, Rendering newRendering) {
+		this.name = box.name;
+		this.attributes = box.attributes;
+		this.props = box.props;
+		this.children = box.children;
+		this.text = box.text;
+		this.replacedElement = box.replacedElement;
+		this.rendering = newRendering;
+	}
+
 	Box copy(QName newName, Map<QName,String> attributes) {
 		return (this instanceof BlockBox) ? new BlockBox(this, newName, attributes) : new InlineBox(this, newName, attributes);
 	}
@@ -85,10 +118,15 @@ public class Box implements Iterable<Box> {
 		return (this instanceof BlockBox) ? new BlockBox(this, newChildren) : new InlineBox(this, newChildren);
 	}
 
+	Box copy(Rendering newRendering) {
+		if (rendering == newRendering) return this;
+		return (this instanceof BlockBox) ? new BlockBox(this, newRendering) : new InlineBox(this, newRendering);
+	}
+
 	public static class BlockBox extends Box {
 
 		BlockBox(Element element, BlockBox parent, Function<Box,Supplier<Box>> children) {
-			super(element.getName(), element.getAttributes(), parent, children, null, element.style);
+			super(element.getName(), element.getAttributes(), parent, children, null, element.style, null);
 		}
 
 		private BlockBox(Box box, QName newName, Map<QName,String> attributes) {
@@ -99,8 +137,12 @@ public class Box implements Iterable<Box> {
 			super(box, newChildren);
 		}
 
+		private BlockBox(Box box, Rendering newRendering) {
+			super(box, newRendering);
+		}
+
 		private BlockBox(BlockBox parent, Function<Box,Supplier<Box>> children) {
-			super(null, null, parent, children, null, new Style(Style.BLOCK, parent.props));
+			super(null, null, parent, children, null, new Style(Style.BLOCK, parent.props), null);
 		}
 	}
 
@@ -114,11 +156,11 @@ public class Box implements Iterable<Box> {
 	public static class InlineBox extends Box {
 
 		InlineBox(Element element, Box parent, Function<Box,Supplier<Box>> children) {
-			super(element.getName(), element.getAttributes(), parent, children, null, element.style);
+			super(element.getName(), element.getAttributes(), parent, children, null, element.style, null);
 		}
 
 		InlineBox(Element element, Box parent, String text) {
-			super(element.getName(), element.getAttributes(), parent, null, text, element.style);
+			super(element.getName(), element.getAttributes(), parent, null, text, element.style, null);
 		}
 
 		private InlineBox(Box box, QName newName, Map<QName,String> attributes) {
@@ -129,12 +171,16 @@ public class Box implements Iterable<Box> {
 			super(box, newChildren);
 		}
 
+		private InlineBox(Box box, Rendering newRendering) {
+			super(box, newRendering);
+		}
+
 		private InlineBox(Box parent, String text) {
-			super(null, null, parent, null, text, new Style(Style.INLINE, parent.props));
+			super(null, null, parent, null, text, new Style(Style.INLINE, parent.props), null);
 		}
 
 		private InlineBox(Box parent, Function<Box,Supplier<Box>> children) {
-			super(null, null, parent, children, null, new Style(Style.INLINE, parent.props));
+			super(null, null, parent, children, null, new Style(Style.INLINE, parent.props), null);
 		}
 
 		public String text() {

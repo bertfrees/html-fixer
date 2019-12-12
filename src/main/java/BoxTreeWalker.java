@@ -237,6 +237,21 @@ class BoxTreeWalker implements Cloneable {
 		return current;
 	}
 
+	// unwrap at the rendering stage if possible (if preserveStyle option allows it and block
+	// structure can be preserved)
+	public Box markCurrentForUnwrap() {
+		Box marked = current.copy(Box.Rendering.ANONYMOUS);
+		updateCurrent(marked);
+		return current;
+	}
+
+	// remove at the rendering stage
+	public Box markCurrentForRemoval() {
+		Box marked = current.copy(Box.Rendering.SKIP);
+		updateCurrent(marked);
+		return current;
+	}
+
 	public Box deleteFirstChild() {
 		ListIterator<Box> children = current.children();
 		if (!children.hasNext())
