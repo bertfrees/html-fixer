@@ -16,6 +16,7 @@ public class BoxTreeWalkerTest {
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 	private static final QName DIV = new QName(HTML_NS, "div");
 	private static final QName P = new QName(HTML_NS, "p");
+	private static final QName SPAN = new QName(HTML_NS, "span");
 	private static final QName _SPAN = new QName(HTML_NS, "_span");
 	private static final QName H1 = new QName(HTML_NS, "h1");
 	private static final QName STRONG = new QName(HTML_NS, "strong");
@@ -181,9 +182,10 @@ public class BoxTreeWalkerTest {
 		// remove all strong within the heading
 		doc = removeStrongInAllStrongBox(doc);
 		// remove all div and p within the heading
+		// remove all span within the heading
 		BoxTreeWalker h = doc.subTree();
-		Predicate<Box> isDivOrP = b -> DIV.equals(b.getName()) || P.equals(b.getName());
-		while (h.firstDescendant(isDivOrP).isPresent() || h.firstFollowing(isDivOrP).isPresent())
+		Predicate<Box> isDivOrPOrSpan = b -> DIV.equals(b.getName()) || P.equals(b.getName()) || SPAN.equals(b.getName());
+		while (h.firstDescendant(isDivOrPOrSpan).isPresent() || h.firstFollowing(isDivOrPOrSpan).isPresent())
 			h.renameCurrent(_SPAN); // if possible unwrap at the rendering stage or otherwise rename to span
 		return doc;
 	}
