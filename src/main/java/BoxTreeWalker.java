@@ -203,11 +203,17 @@ class BoxTreeWalker implements Cloneable {
 				return previous;
 			else
 				while (true) {
-					if ((previous = previousSibling()).isPresent()) {
+					Optional<Box> p;
+					if ((p = previousSibling()).isPresent()) {
+						previous = p;
 						while (true)
-							if ((previous = firstChild()).isPresent()) {
-								if ((previous = nextSibling()).isPresent())
-									while ((previous = nextSibling()).isPresent());
+							if ((p = firstChild()).isPresent()) {
+								previous = p;
+								if ((p = nextSibling()).isPresent()) {
+									previous = p;
+									while ((p = nextSibling()).isPresent())
+										previous = p;
+								}
 							} else
 								break;
 					} else {
