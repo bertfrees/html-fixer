@@ -1,3 +1,4 @@
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -198,33 +199,69 @@ public final class Transformations {
 				assertThat(false);
 		}
 		// process items
-		assertThat(doc.firstChild().isPresent());
-		do {
-			assertThat(LI.equals(doc.current().getName()));
-			assertThat(doc.firstChild().isPresent());
-			// wrap content in a
-			if (!A.equals(doc.current().getName()) || doc.nextSibling().isPresent()) {
-				doc.parent();
-				BoxTreeWalker li = doc.subTree();
-				// take first descendant a and move it
-				assertThat(li.firstDescendant(b -> A.equals(b.getName())).isPresent());
-				Box a = li.current();
-				String href = a.getAttributes().get(HREF);
-				assertThat(href != null);
-				// remove this a and all other a with the same href
-				li = unwrapAll(li, b -> A.equals(b.getName()) && href.equals(b.getAttributes().get(HREF)));
-				li.root();
-				li.wrapChildren(a.getName(), a.getAttributes());
-				// remove all div and p within the heading
-				li.root();
-				Predicate<Box> isDivOrP = b -> DIV.equals(b.getName()) || P.equals(b.getName());
-				while (li.firstDescendant(isDivOrP).isPresent() || li.firstFollowing(isDivOrP).isPresent()) {
-					li.renameCurrent(SPAN);
-					li.markCurrentForUnwrap();
-				}
-			} else
-				doc.parent();
-		} while (doc.nextSibling().isPresent());
+		new Function<BoxTreeWalker,BoxTreeWalker>() {
+			public BoxTreeWalker apply(BoxTreeWalker ol) {
+				assertThat(ol.firstChild().isPresent());
+				do {
+					assertThat(LI.equals(ol.current().getName()));
+					assertThat(ol.firstChild().isPresent());
+					int childCount = 1;
+					while (ol.nextSibling().isPresent()) childCount++;
+					if (childCount == 1 && A.equals(ol.current().getName()) && ol.current().getAttributes().containsKey(HREF)) {
+						ol.parent();
+						continue;
+					}
+					if (OL.equals(ol.current().getName())) {
+						if (childCount == 1)
+							assert(false);
+						// process nested list
+						ol = apply(ol);
+						if (childCount == 2) {
+							ol.previousSibling();
+							if (A.equals(ol.current().getName()) && ol.current().getAttributes().containsKey(HREF)) {
+								ol.parent();
+								continue;
+							}
+						} else {
+							ol.parent();
+							ol.wrapFirstChildren(childCount - 1, SPAN);
+							childCount = 2;
+							ol.firstChild();
+						}
+					} else if (childCount > 1) {
+						ol.parent();
+						ol.wrapChildren(SPAN);
+						childCount = 1;
+						ol.firstChild();
+					}
+					// find first descendant a
+					BoxTreeWalker span = ol.subTree();
+					if (!span.firstDescendant(x -> A.equals(x.getName()) && x.getAttributes().containsKey(HREF)).isPresent())
+						if (childCount == 2) {
+							ol.parent();
+							continue;
+						} else
+							assertThat(false);
+					Box a = span.current();
+					String href = a.getAttributes().get(HREF);
+					// remove this a and all other a with the same href
+					span = unwrapAll(span, x -> A.equals(x.getName()) && href.equals(x.getAttributes().get(HREF)));
+					// rename span to a
+					span.root();
+					span.renameCurrent(a.getName(), a.getAttributes());
+					ol.parent();
+				} while (ol.nextSibling().isPresent());
+				ol.parent();
+				return ol;
+			}
+		}.apply(doc);
+		// remove all div and p within the table of contents
+		BoxTreeWalker toc = doc.subTree();
+		Predicate<Box> isDivOrP = x -> DIV.equals(x.getName()) || P.equals(x.getName());
+		while (toc.firstDescendant(isDivOrP).isPresent() || toc.firstFollowing(isDivOrP).isPresent()) {
+			toc.renameCurrent(SPAN);
+			toc.markCurrentForUnwrap();
+		}
 		return doc;
 	}
 

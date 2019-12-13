@@ -1,3 +1,3 @@
 @SuppressWarnings("serial")
-public class CanNotPerformTransformationException extends Exception {
+public class CanNotPerformTransformationException extends RuntimeException {
 }
