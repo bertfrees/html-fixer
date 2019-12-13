@@ -24,13 +24,15 @@ public class TransformationsTest {
 
 		URL html = BoxTreeWalkerTest.class.getResource("test.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
-		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
-		walker = Transformations.transformTable(walker, 0, 3, true);
-		walker = Transformations.markupHeading(walker, 0, 3, H1);
-		walker = Transformations.removeImage(walker, 1, 0);
-		utils.serialize(walker.root());
-		utils.render(walker.root(), true);
-		utils.render(walker.root(), false);
+		Box transformed = new Transformations(doc.root().getBox())
+				.moveTo(0, 3)    .transformTable(true)
+				                 .markupHeading(H1)
+				.moveTo(1, 0, 1) .removeImage()
+				.get();
+		
+		utils.serialize(transformed);
+		utils.render(transformed, true);
+		utils.render(transformed, false);
 	}
 
 	@Test
@@ -40,11 +42,15 @@ public class TransformationsTest {
 
 		URL html = BoxTreeWalkerTest.class.getResource("test2.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
-		BoxTreeWalker walker = new BoxTreeWalker(doc.root().getBox());
-		walker = Transformations.transformTable(walker, 1, 150, false);
-		walker = Transformations.convertToList(walker, 1, 150, OL, null, LI);
-		walker = Transformations.transformNavList(walker, 1, 150);
-		walker = Transformations.wrapList(walker, 0, 151, 1, NAV);
-		utils.render(walker.root(), false);
+		Box transformed = new Transformations(doc.root().getBox())
+				.moveTo(0, 1)    .markupHeading(H1)
+				.moveTo(0, 0, 1) .removeImage()
+				.moveTo(1, 150)  .transformTable(false)
+				                 .convertToList(OL, null, LI)
+				                 .transformNavList()
+				.moveTo(0, 151)  .wrapList(1, NAV)
+				.get();
+		
+		utils.render(transformed, false);
 	}
 }

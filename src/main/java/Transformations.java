@@ -7,7 +7,148 @@ import javax.xml.namespace.QName;
 
 import com.google.common.collect.ImmutableMap;
 
-public final class Transformations {
+public class Transformations {
+
+	private BoxTreeWalker doc;
+	private BoxTreeWalker root;
+	private InputRange currentRange;
+
+	public Transformations(Box doc) {
+		this.root = new BoxTreeWalker(doc);
+		this.doc = root.subTree();
+		this.currentRange = null;
+	}
+
+	public Box get() {
+		return root.current();
+	}
+
+	private static class InputRange {
+		// 0-based index of start block
+		public final int startBlockIndex;
+		// if non-negative, 0-based index of the start inline unit within the start block
+		public final int startInlineIndex;
+		// number of blocks or inline units in the range
+		public final int size;
+		public InputRange(int startBlockIndex) {
+			this(startBlockIndex, -1, 1);
+		}
+		public InputRange(int startBlockIndex, int size) {
+			this(startBlockIndex, -1, size);
+		}
+		public InputRange(int startBlockIndex, int startInlineIndex, int size) {
+			if (startBlockIndex < 0) throw new IllegalArgumentException();
+			if (size < 1) throw new IllegalArgumentException();
+			this.startBlockIndex = startBlockIndex;
+			this.startInlineIndex = startInlineIndex;
+			this.size = size;
+		}
+	}
+
+	public Transformations moveTo(int startBlockIndex) {
+		currentRange = new InputRange(startBlockIndex);
+		return this;
+	}
+
+	public Transformations moveTo(int startBlockIndex, int size) {
+		currentRange = new InputRange(startBlockIndex, size);
+		return this;
+	}
+
+	public Transformations moveTo(int startBlockIndex, int startInlineIndex, int size) {
+		currentRange = new InputRange(startBlockIndex, startInlineIndex, size);
+		return this;
+	}
+
+	public Transformations transformTable(boolean singleRow) throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = transformTable(doc, currentRange.size, singleRow);
+		return this;
+	}
+
+	public Transformations markupHeading(QName headingElement) throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = markupHeading(doc, currentRange.size, headingElement);
+		return this;
+	}
+
+	public Transformations removeImage() throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = removeImage(doc, currentRange.size);
+		return this;
+	}
+
+	public Transformations convertToList(QName listElement,
+	                                     Map<QName,String> listAttributes,
+	                                     QName listItemElement) throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = convertToList(doc, currentRange.size, listElement, listAttributes, listItemElement);
+		return this;
+	}
+
+	public Transformations convertToPoem() throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = convertToPoem(doc, currentRange.size);
+		return this;
+	}
+
+	/*
+	 * Transform a list so that it conforms to the navigation document spec
+	 * http://idpf.org/epub/301/spec/epub-contentdocs.html#sec-xhtml-nav
+	 *
+	 * - main list and nested lists must be "ol"
+	 * - every "li" must contain either a "a" or a "span", optionally followed by a nested "ol"
+	 *   (mandatory after "span")
+	 */
+	public Transformations transformNavList() throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = transformNavList(doc, currentRange.size);
+		return this;
+	}
+
+	/*
+	 * Wrap a list together with some pre-content
+	 *
+	 * @param preContentBlockCount may be 0
+	 *
+	 * On return current box is the wrapper
+	 */
+	public Transformations wrapList(int preContentBlockCount,
+	                                QName wrapper) throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = wrapList(doc, currentRange.size, preContentBlockCount, wrapper);
+		return this;
+	}
+
+	public Transformations wrapListInPrevious() throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = wrapListInPrevious(doc, currentRange.size);
+		return this;
+	}
+
+	/*
+	 * @param captionBlockCount may be 0
+	 */
+	public Transformations wrapInFigure(int captionBlockCount,
+	                                    boolean captionBefore) throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = wrapInFigure(doc, currentRange.size, captionBlockCount, captionBefore);
+		return this;
+	}
+
+	public Transformations removeHiddenBox() throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = removeHiddenBox(doc, currentRange.size);
+		return this;
+	}
+
+	public Transformations markupPageBreak() throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = markupPageBreak(doc, currentRange.size);
+		return this;
+	}
+
+	/////////////////////////////////////////////////////////////////////
 
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 	private static final String EPUB_NS = "http://www.idpf.org/2007/ops";
@@ -31,15 +172,12 @@ public final class Transformations {
 	private static final Map<QName,String> EPUB_TYPE_PAGEBREAK = ImmutableMap.of(new QName(EPUB_NS, "type"), "pagebreak");
 
 	/*
-	 * @param firstBlockIdx 0-based index of first block
-	 * @param blockCount number of blocks in table row (must be at least one)
+	 * @param blockCount number of blocks in table (one or more)
 	 */
-	public static BoxTreeWalker transformTable(BoxTreeWalker doc,
-	                                           int firstBlockIdx,
-	                                           int blockCount,
-	                                           boolean singleRow) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, firstBlockIdx);
+	private static BoxTreeWalker transformTable(BoxTreeWalker doc,
+	                                            int blockCount,
+	                                            boolean singleRow) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
 		// find and rename first cell
 		while (true) {
 			assertThat(!doc.previousSibling().isPresent());
@@ -96,12 +234,12 @@ public final class Transformations {
 		return doc;
 	}
 
-	public static BoxTreeWalker markupHeading(BoxTreeWalker doc,
-	                                          int firstBlockIdx,
-	                                          int blockCount,
-	                                          QName headingElement) throws CanNotPerformTransformationException {
+	private static BoxTreeWalker markupHeading(BoxTreeWalker doc,
+	                                           int blockCount,
+	                                           QName headingElement) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
 		// find ancestor that contains the specified number of blocks, or create it
-		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
+		doc = wrapIfNeeded(doc, blockCount);
 		// rename to heading
 		doc.renameCurrent(headingElement);
 		// remove strong, em and small within the heading
@@ -120,19 +258,8 @@ public final class Transformations {
 		return doc;
 	}
 
-	/*
-	 * @param blockIdx 0-based index of block that contains (or is) the img
-	 * @param inlineIdx 0-based index of img within the block, or -1 if the block is the img
-	 */
-	public static BoxTreeWalker removeImage(BoxTreeWalker doc,
-	                                        int blockIdx,
-	                                        int inlineIdx) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, blockIdx);
-		if (inlineIdx >= 0) {
-			assertThat(inlineIdx < count(doc, b -> b.hasText() || b.isReplacedElement()));
-			nthReplacedElementOrTextBox(doc, inlineIdx);
-		}
+	private static BoxTreeWalker removeImage(BoxTreeWalker doc, int size) throws CanNotPerformTransformationException {
+		assertThat(size == 1);
 		assertThat(IMG.equals(doc.current().getName()));
 		assertThat(doc.current().isReplacedElement());
 		doc.markCurrentForRemoval();
@@ -144,14 +271,14 @@ public final class Transformations {
 		return doc;
 	}
 
-	public static BoxTreeWalker convertToList(BoxTreeWalker doc,
-	                                          int firstBlockIdx,
-	                                          int blockCount,
-	                                          QName listElement,
-	                                          Map<QName,String> listAttributes,
-	                                          QName listItemElement) throws CanNotPerformTransformationException {
+	private static BoxTreeWalker convertToList(BoxTreeWalker doc,
+	                                           int blockCount,
+	                                           QName listElement,
+	                                           Map<QName,String> listAttributes,
+	                                           QName listItemElement) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
 		// find ancestor that contains the specified number of blocks, or create it
-		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
+		doc = wrapIfNeeded(doc, blockCount);
 		// rename to list or wrap with new list element
 		if (doc.current().isBlockAndHasNoBlockChildren())
 			doc.wrapCurrent(listElement, listAttributes);
@@ -166,25 +293,14 @@ public final class Transformations {
 		return doc;
 	}
 
-	public static BoxTreeWalker convertToPoem(BoxTreeWalker doc,
-	                                          int firstBlockIdx,
-	                                          int blockCount) throws CanNotPerformTransformationException {
-		return convertToList(doc, firstBlockIdx, blockCount, DIV, EPUB_TYPE_Z3998_POEM, P);
+	private static BoxTreeWalker convertToPoem(BoxTreeWalker doc,
+	                                           int blockCount) throws CanNotPerformTransformationException {
+		return convertToList(doc, blockCount, DIV, EPUB_TYPE_Z3998_POEM, P);
 	}
 
-	/*
-	 * Transform a list so that it conforms to the navigation document spec
-	 * http://idpf.org/epub/301/spec/epub-contentdocs.html#sec-xhtml-nav
-	 *
-	 * - main list and nested lists must be "ol"
-	 * - every "li" must contain either a "a" or a "span", optionally followed by a nested "ol"
-	 *   (mandatory after "span")
-	 */
-	public static BoxTreeWalker transformNavList(BoxTreeWalker doc,
-	                                             int firstBlockIdx,
-	                                             int blockCount) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, firstBlockIdx);
+	private static BoxTreeWalker transformNavList(BoxTreeWalker doc,
+	                                              int blockCount) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
 		// find root list element
 		int listBlockCount = 1;
 		while (true) {
@@ -245,9 +361,9 @@ public final class Transformations {
 					Box a = span.current();
 					String href = a.getAttributes().get(HREF);
 					// remove this a and all other a with the same href
+					span.root();
 					span = unwrapAll(span, x -> A.equals(x.getName()) && href.equals(x.getAttributes().get(HREF)));
 					// rename span to a
-					span.root();
 					span.renameCurrent(a.getName(), a.getAttributes());
 					ol.parent();
 				} while (ol.nextSibling().isPresent());
@@ -265,20 +381,12 @@ public final class Transformations {
 		return doc;
 	}
 
-	/*
-	 * Wrap a list together with some pre-content
-	 *
-	 * @param preContentBlockCount may be 0
-	 *
-	 * On return current box is the wrapper
-	 */
-	public static BoxTreeWalker wrapList(BoxTreeWalker doc,
-	                                     int firstBlockIdx,
-	                                     int blockCount,
-	                                     int preContentBlockCount,
-	                                     QName wrapper) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, firstBlockIdx + preContentBlockCount);
+	private static BoxTreeWalker wrapList(BoxTreeWalker doc,
+	                                      int blockCount,
+	                                      int preContentBlockCount,
+	                                      QName wrapper) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
+		doc = moveNBlocks(doc, preContentBlockCount);
 		// find list element
 		int listBlockCount = 1;
 		while (true) {
@@ -327,10 +435,9 @@ public final class Transformations {
 		return doc;
 	}
 
-	public static BoxTreeWalker wrapListInPrevious(BoxTreeWalker doc,
-	                                               int firstBlockIdx,
-	                                               int blockCount) throws CanNotPerformTransformationException {
-		doc = wrapList(doc, firstBlockIdx, blockCount, 1, new QName("_"));
+	private static BoxTreeWalker wrapListInPrevious(BoxTreeWalker doc,
+	                                                int blockCount) throws CanNotPerformTransformationException {
+		doc = wrapList(doc, blockCount, 1, new QName("_"));
 		QName wrapper = doc.firstChild().get().getName();
 		doc.renameCurrent(null);
 		doc.parent();
@@ -338,26 +445,26 @@ public final class Transformations {
 		return doc;
 	}
 
-	/*
-	 * @param captionBlockCount may be 0
-	 */
-	public static BoxTreeWalker wrapInFigure(BoxTreeWalker doc,
-	                                         int firstBlockIdx,
-	                                         int blockCount,
-	                                         int captionBlockCount,
-	                                         boolean captionBefore) throws CanNotPerformTransformationException {
+	private static BoxTreeWalker wrapInFigure(BoxTreeWalker doc,
+	                                          int blockCount,
+	                                          int captionBlockCount,
+	                                          boolean captionBefore) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
+		assertThat(blockCount > captionBlockCount);
 		if (captionBlockCount > 0) {
-			doc = wrapIfNeeded(doc,
-			                   captionBefore
-			                       ? firstBlockIdx
-			                       : firstBlockIdx + blockCount - captionBlockCount,
-			                   captionBlockCount);
+			if (!captionBefore)
+				doc = moveNBlocks(doc, blockCount - captionBlockCount);
+			doc = wrapIfNeeded(doc, captionBlockCount);
 			doc.renameCurrent(FIGCAPTION);
 			doc = removeEmInAllEmBox(doc, STRONG);
 			doc = removeEmInAllEmBox(doc, EM);
 			doc = removeEmInAllEmBox(doc, SMALL);
+			if (!captionBefore)
+				doc = moveNBlocks(doc, captionBlockCount - blockCount);
+			else if (!doc.current().isBlockAndHasNoBlockChildren())
+				doc.firstDescendant(Box::isBlockAndHasNoBlockChildren);
 		}
-		doc = wrapIfNeeded(doc, firstBlockIdx, blockCount);
+		doc = wrapIfNeeded(doc, blockCount);
 		doc.renameCurrent(FIGURE);
 		if (blockCount - captionBlockCount == 1 && captionBlockCount != 0) {
 			doc.firstChild();
@@ -368,10 +475,10 @@ public final class Transformations {
 		return doc;
 	}
 
-	public static BoxTreeWalker removeHiddenBox(BoxTreeWalker doc,
-	                                            int blockIdx) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, blockIdx);
+	private static BoxTreeWalker removeHiddenBox(BoxTreeWalker doc,
+	                                             int size) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
+		assertThat(size == 1);
 		assertThat("hidden".equals(doc.current().props.visibility()));
 		// check that all contained boxes inherit visibility
 		BoxTreeWalker box = doc.subTree();
@@ -389,10 +496,10 @@ public final class Transformations {
 		return doc;
 	}
 
-	public static BoxTreeWalker markupPageBreak(BoxTreeWalker doc,
-	                                            int blockIdx) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, blockIdx);
+	private static BoxTreeWalker markupPageBreak(BoxTreeWalker doc,
+	                                             int size) throws CanNotPerformTransformationException {
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
+		assertThat(size == 1);
 		doc.renameCurrent(DIV, EPUB_TYPE_PAGEBREAK);
 		return doc;
 	}
@@ -429,17 +536,38 @@ public final class Transformations {
 
 	private static final Pattern WHITE_SPACE = Pattern.compile("\\s*");
 
-	private static void nthBlock(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
-		assertThat(doc.firstDescendant(Box::isBlockAndHasNoBlockChildren).isPresent());
-		for (int i = 0; i < index; i++)
-			assertThat(doc.firstFollowing(Box::isBlockAndHasNoBlockChildren).isPresent());
+	private BoxTreeWalker moveToRange(BoxTreeWalker doc, InputRange range) throws CanNotPerformTransformationException {
+		assertThat(range != null);
+		doc.root();
+		int n = range.startBlockIndex;
+		if (doc.current().isBlockAndHasNoBlockChildren())
+			assertThat(n == 0);
+		else {
+			doc = moveNBlocks(doc, n + 1);
+			if (range.startInlineIndex >= 0) {
+				Predicate<Box> isReplacedElementOrTextBox = b -> b.hasText() || b.isReplacedElement();
+				assertThat(range.startInlineIndex < count(doc, isReplacedElementOrTextBox));
+				assertThat(doc.firstDescendant(isReplacedElementOrTextBox).isPresent());
+				for (int i = 0; i < range.startInlineIndex; i++)
+					assertThat(doc.firstFollowing(isReplacedElementOrTextBox).isPresent());
+			}
+		}
+		return doc;
 	}
 
-	private static void nthReplacedElementOrTextBox(BoxTreeWalker doc, int index) throws CanNotPerformTransformationException {
-		Predicate<Box> isReplacedElementOrTextBox = b -> b.hasText() || b.isReplacedElement();
-		assertThat(doc.firstDescendant(isReplacedElementOrTextBox).isPresent());
-		for (int i = 0; i < index; i++)
-			assertThat(doc.firstFollowing(isReplacedElementOrTextBox).isPresent());
+	private static BoxTreeWalker moveNBlocks(BoxTreeWalker doc, int n) throws CanNotPerformTransformationException {
+		if (n > 0) {
+			if (doc.firstDescendant(Box::isBlockAndHasNoBlockChildren).isPresent())
+				n--;
+			while (n-- > 0)
+				assertThat(doc.firstFollowing(Box::isBlockAndHasNoBlockChildren).isPresent());
+		} else if (n < 0) {
+			if (doc.firstParent(Box::isBlockAndHasNoBlockChildren).isPresent())
+				n++;
+			while (n++ < 0)
+				assertThat(doc.firstPreceding(Box::isBlockAndHasNoBlockChildren).isPresent());
+		}
+		return doc;
 	}
 
 	/*
@@ -455,24 +583,24 @@ public final class Transformations {
 	}
 
 	private static BoxTreeWalker unwrapAll(BoxTreeWalker doc, Predicate<Box> select) {
-		doc.root();
+		BoxTreeWalker subtree = doc.subTree();
 		while (true) {
-			Box current = doc.current();
+			Box current = subtree.current();
 			if (select.test(current))
-				if (doc.firstChild().isPresent()) {
-					doc.unwrapParent();
+				if (subtree.firstChild().isPresent()) {
+					subtree.unwrapParent();
 					continue;
-				} else if (doc.previousSibling().isPresent()) {
-					doc.unwrapNextSibling();
-					if (doc.firstFollowing().isPresent())
+				} else if (subtree.previousSibling().isPresent()) {
+					subtree.unwrapNextSibling();
+					if (subtree.firstFollowing().isPresent())
 						continue;
 					else
 						break;
-				} else if (doc.parent().isPresent())
-					doc.unwrapFirstChild();
+				} else if (subtree.parent().isPresent())
+					subtree.unwrapFirstChild();
 				else
 					break;
-			if (doc.firstChild().isPresent() || doc.firstFollowing().isPresent())
+			if (subtree.firstChild().isPresent() || subtree.firstFollowing().isPresent())
 				continue;
 			else
 				break;
@@ -483,10 +611,8 @@ public final class Transformations {
 	/* Manipulate the tree so that on return current box contains exactly the specified blocks. If
 	 * needed, insert a new anonymous box. */
 	private static BoxTreeWalker wrapIfNeeded(BoxTreeWalker doc,
-	                                          int firstBlockIdx,
 	                                          int blockCount) throws CanNotPerformTransformationException {
-		doc.root();
-		nthBlock(doc, firstBlockIdx);
+		assertThat(doc.current().isBlockAndHasNoBlockChildren());
 		// find box that contains exactly the specified blocks, or if it doesn't exist find the first child box
 		int firstBoxBlockCount = 1;
 		while (true) {
@@ -530,6 +656,4 @@ public final class Transformations {
 	private static void assertThat(boolean test) throws CanNotPerformTransformationException {
 		if (!test) throw new CanNotPerformTransformationException();
 	}
-
-	private Transformations() {}
 }
