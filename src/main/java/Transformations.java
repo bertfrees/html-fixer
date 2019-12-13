@@ -269,6 +269,8 @@ public final class Transformations {
 	 * Wrap a list together with some pre-content
 	 *
 	 * @param preContentBlockCount may be 0
+	 *
+	 * On return current box is the wrapper
 	 */
 	public static BoxTreeWalker wrapList(BoxTreeWalker doc,
 	                                     int firstBlockIdx,
@@ -305,19 +307,34 @@ public final class Transformations {
 			assertThat(preContentBlockCount == 0);
 		}
 		boolean preContentHasPreviousSibling = doc.previousSibling().isPresent();
-		if (preContentHasPreviousSibling)
+		if (preContentHasPreviousSibling) {
 			doc.wrapNextSiblings(childrenCount, wrapper);
-		else if (listHasNextSibling) {
+			doc.nextSibling();
+		} else if (listHasNextSibling) {
 			doc.parent();
 			doc.wrapFirstChildren(childrenCount, wrapper);
+			doc.firstChild();
 		} else {
 			assertThat(doc.parent().isPresent());
 			if (!wrapper.equals(doc.current().getName()))
 				if (DIV.equals(doc.current().getName()))
 					doc.renameCurrent(wrapper);
-				else
+				else {
 					doc.wrapChildren(wrapper);
+					doc.firstChild();
+				}
 		}
+		return doc;
+	}
+
+	public static BoxTreeWalker wrapListInPrevious(BoxTreeWalker doc,
+	                                               int firstBlockIdx,
+	                                               int blockCount) throws CanNotPerformTransformationException {
+		doc = wrapList(doc, firstBlockIdx, blockCount, 1, new QName("_"));
+		QName wrapper = doc.firstChild().get().getName();
+		doc.renameCurrent(null);
+		doc.parent();
+		doc.renameCurrent(wrapper);
 		return doc;
 	}
 
