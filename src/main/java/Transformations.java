@@ -68,7 +68,20 @@ public class Transformations {
 
 	public Transformations markupHeading(QName headingElement) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
-		doc = markupHeading(doc, currentRange.size, headingElement);
+		doc = markupHeading(doc, currentRange.size, -1, headingElement, null);
+		return this;
+	}
+
+	/*
+	 * @param indexOfHeading If non-negative, convert only this block to a heading, otherwise convert the whole range
+	 * @param headingElement The name of the heading element
+	 * @param headerElement The name of the header element containing the whole range if indexOfHeading is non-negative
+	 */
+	public Transformations markupHeading(int indexOfHeading,
+	                                     QName headingElement,
+	                                     QName headerElement) throws CanNotPerformTransformationException {
+		doc = moveToRange(doc, currentRange);
+		doc = markupHeading(doc, currentRange.size, indexOfHeading, headingElement, headerElement);
 		return this;
 	}
 
@@ -167,6 +180,12 @@ public class Transformations {
 	private static final QName HREF = new QName("href");
 	private static final QName FIGURE = new QName(HTML_NS, "figure");
 	private static final QName FIGCAPTION = new QName(HTML_NS, "figcaption");
+	private static final QName H1 = new QName(HTML_NS, "h1");
+	private static final QName H2 = new QName(HTML_NS, "h2");
+	private static final QName H3 = new QName(HTML_NS, "h3");
+	private static final QName H4 = new QName(HTML_NS, "h4");
+	private static final QName H5 = new QName(HTML_NS, "h5");
+	private static final QName H6 = new QName(HTML_NS, "h6");
 
 	private static final Map<QName,String> EPUB_TYPE_Z3998_POEM = ImmutableMap.of(new QName(EPUB_NS, "type"), "z3998:poem");
 	private static final Map<QName,String> EPUB_TYPE_PAGEBREAK = ImmutableMap.of(new QName(EPUB_NS, "type"), "pagebreak");
@@ -236,10 +255,18 @@ public class Transformations {
 
 	private static BoxTreeWalker markupHeading(BoxTreeWalker doc,
 	                                           int blockCount,
-	                                           QName headingElement) throws CanNotPerformTransformationException {
+	                                           int indexOfHeading,
+	                                           QName headingElement,
+	                                           QName headerElement) throws CanNotPerformTransformationException {
 		assertThat(doc.current().isBlockAndHasNoBlockChildren());
-		// find ancestor that contains the specified number of blocks, or create it
-		doc = wrapIfNeeded(doc, blockCount);
+		if (indexOfHeading >= 0) {
+			doc = moveNBlocks(doc, indexOfHeading);
+			// move to parent block if no siblings
+			doc = wrapIfNeeded(doc, 1);
+		} else {
+			// find ancestor that contains the specified number of blocks, or create it
+			doc = wrapIfNeeded(doc, blockCount);
+		}
 		// rename to heading
 		doc.renameCurrent(headingElement);
 		// remove strong, em and small within the heading
@@ -254,6 +281,24 @@ public class Transformations {
 			if (!SPAN.equals(h.current().getName()))
 				h.renameCurrent(SPAN);
 			h.markCurrentForUnwrap();
+		}
+		if (indexOfHeading >= 0 && headerElement != null) {
+			doc = moveNBlocks(doc, - indexOfHeading);
+			// find ancestor that contains the specified number of blocks, or create it
+			assertThat(blockCount > 1);
+			doc = wrapIfNeeded(doc, blockCount);
+			// rename to header
+			doc.renameCurrent(headerElement);
+			// make sure there is only one heading inside the header
+			BoxTreeWalker header = doc.subTree();
+			header.firstDescendant(Box::isBlockAndHasNoBlockChildren);
+			do {
+				if (indexOfHeading-- != 0) {
+					QName name = header.current().getName();
+					if (H1.equals(name) || H2.equals(name) || H3.equals(name) || H4.equals(name) || H5.equals(name) || H6.equals(name))
+						header.renameCurrent(P);
+				}
+			} while (header.firstFollowing(Box::isBlockAndHasNoBlockChildren).isPresent());
 		}
 		return doc;
 	}
