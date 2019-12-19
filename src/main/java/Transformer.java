@@ -7,13 +7,13 @@ import javax.xml.namespace.QName;
 
 import com.google.common.collect.ImmutableMap;
 
-public class Transformations {
+public class Transformer {
 
 	private BoxTreeWalker doc;
 	private BoxTreeWalker root;
 	private Fragment currentRange;
 
-	public Transformations(Box doc) {
+	public Transformer(Box doc) {
 		this.root = new BoxTreeWalker(doc);
 		this.doc = root.subTree();
 		this.currentRange = null;
@@ -23,28 +23,28 @@ public class Transformations {
 		return root.current();
 	}
 
-	public Transformations moveTo(int startBlockIndex) {
+	public Transformer moveTo(int startBlockIndex) {
 		currentRange = new Fragment(startBlockIndex);
 		return this;
 	}
 
-	public Transformations moveTo(int startBlockIndex, int size) {
+	public Transformer moveTo(int startBlockIndex, int size) {
 		currentRange = new Fragment(startBlockIndex, size);
 		return this;
 	}
 
-	public Transformations moveTo(int startBlockIndex, int startInlineIndex, int size) {
+	public Transformer moveTo(int startBlockIndex, int startInlineIndex, int size) {
 		currentRange = new Fragment(startBlockIndex, startInlineIndex, size);
 		return this;
 	}
 
-	public Transformations transformTable(boolean singleRow) throws CanNotPerformTransformationException {
+	public Transformer transformTable(boolean singleRow) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = transformTable(doc, currentRange.size, singleRow);
 		return this;
 	}
 
-	public Transformations markupHeading(QName headingElement) throws CanNotPerformTransformationException {
+	public Transformer markupHeading(QName headingElement) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = markupHeading(doc, currentRange.size, -1, headingElement, null);
 		return this;
@@ -55,29 +55,29 @@ public class Transformations {
 	 * @param headingElement The name of the heading element
 	 * @param headerElement The name of the header element containing the whole range if indexOfHeading is non-negative
 	 */
-	public Transformations markupHeading(int indexOfHeading,
-	                                     QName headingElement,
-	                                     QName headerElement) throws CanNotPerformTransformationException {
+	public Transformer markupHeading(int indexOfHeading,
+	                                 QName headingElement,
+	                                 QName headerElement) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = markupHeading(doc, currentRange.size, indexOfHeading, headingElement, headerElement);
 		return this;
 	}
 
-	public Transformations removeImage() throws CanNotPerformTransformationException {
+	public Transformer removeImage() throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = removeImage(doc, currentRange.size);
 		return this;
 	}
 
-	public Transformations convertToList(QName listElement,
-	                                     Map<QName,String> listAttributes,
-	                                     QName listItemElement) throws CanNotPerformTransformationException {
+	public Transformer convertToList(QName listElement,
+	                                 Map<QName,String> listAttributes,
+	                                 QName listItemElement) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = convertToList(doc, currentRange.size, listElement, listAttributes, listItemElement);
 		return this;
 	}
 
-	public Transformations convertToPoem() throws CanNotPerformTransformationException {
+	public Transformer convertToPoem() throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = convertToPoem(doc, currentRange.size);
 		return this;
@@ -91,7 +91,7 @@ public class Transformations {
 	 * - every "li" must contain either a "a" or a "span", optionally followed by a nested "ol"
 	 *   (mandatory after "span")
 	 */
-	public Transformations transformNavList() throws CanNotPerformTransformationException {
+	public Transformer transformNavList() throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = transformNavList(doc, currentRange.size);
 		return this;
@@ -104,14 +104,14 @@ public class Transformations {
 	 *
 	 * On return current box is the wrapper
 	 */
-	public Transformations wrapList(int preContentBlockCount,
-	                                QName wrapper) throws CanNotPerformTransformationException {
+	public Transformer wrapList(int preContentBlockCount,
+	                            QName wrapper) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = wrapList(doc, currentRange.size, preContentBlockCount, wrapper);
 		return this;
 	}
 
-	public Transformations wrapListInPrevious() throws CanNotPerformTransformationException {
+	public Transformer wrapListInPrevious() throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = wrapListInPrevious(doc, currentRange.size);
 		return this;
@@ -120,20 +120,20 @@ public class Transformations {
 	/*
 	 * @param captionBlockCount may be 0
 	 */
-	public Transformations wrapInFigure(int captionBlockCount,
-	                                    boolean captionBefore) throws CanNotPerformTransformationException {
+	public Transformer wrapInFigure(int captionBlockCount,
+	                                boolean captionBefore) throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = wrapInFigure(doc, currentRange.size, captionBlockCount, captionBefore);
 		return this;
 	}
 
-	public Transformations removeHiddenBox() throws CanNotPerformTransformationException {
+	public Transformer removeHiddenBox() throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = removeHiddenBox(doc, currentRange.size);
 		return this;
 	}
 
-	public Transformations markupPageBreak() throws CanNotPerformTransformationException {
+	public Transformer markupPageBreak() throws CanNotPerformTransformationException {
 		doc = moveToRange(doc, currentRange);
 		doc = markupPageBreak(doc, currentRange.size);
 		return this;

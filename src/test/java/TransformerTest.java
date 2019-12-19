@@ -8,7 +8,7 @@ import net.sf.saxon.s9api.SaxonApiException;
 
 import org.junit.Test;
 
-public class TransformationsTest {
+public class TransformerTest {
 
 	private static final String HTML_NS = "http://www.w3.org/1999/xhtml";
 
@@ -24,7 +24,7 @@ public class TransformationsTest {
 
 		URL html = BoxTreeWalkerTest.class.getResource("test.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
-		Box transformed = new Transformations(doc.root().getBox())
+		Box transformed = new Transformer(doc.root().getBox())
 				.moveTo(0, 3)    .transformTable(true)
 				                 .markupHeading(H1)
 				.moveTo(1, 0, 1) .removeImage()
@@ -42,7 +42,7 @@ public class TransformationsTest {
 
 		URL html = BoxTreeWalkerTest.class.getResource("test2.xhtml");
 		Document doc = Parser.parse(html.openStream(), html);
-		Box transformed = new Transformations(doc.root().getBox())
+		Box transformed = new Transformer(doc.root().getBox())
 				.moveTo(0, 1)    .markupHeading(H1)
 				.moveTo(0, 0, 1) .removeImage()
 				.moveTo(1, 150)  .transformTable(false)
