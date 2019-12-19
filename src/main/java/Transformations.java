@@ -11,7 +11,7 @@ public class Transformations {
 
 	private BoxTreeWalker doc;
 	private BoxTreeWalker root;
-	private InputRange currentRange;
+	private Fragment currentRange;
 
 	public Transformations(Box doc) {
 		this.root = new BoxTreeWalker(doc);
@@ -23,40 +23,18 @@ public class Transformations {
 		return root.current();
 	}
 
-	private static class InputRange {
-		// 0-based index of start block
-		public final int startBlockIndex;
-		// if non-negative, 0-based index of the start inline unit within the start block
-		public final int startInlineIndex;
-		// number of blocks or inline units in the range
-		public final int size;
-		public InputRange(int startBlockIndex) {
-			this(startBlockIndex, -1, 1);
-		}
-		public InputRange(int startBlockIndex, int size) {
-			this(startBlockIndex, -1, size);
-		}
-		public InputRange(int startBlockIndex, int startInlineIndex, int size) {
-			if (startBlockIndex < 0) throw new IllegalArgumentException();
-			if (size < 1) throw new IllegalArgumentException();
-			this.startBlockIndex = startBlockIndex;
-			this.startInlineIndex = startInlineIndex;
-			this.size = size;
-		}
-	}
-
 	public Transformations moveTo(int startBlockIndex) {
-		currentRange = new InputRange(startBlockIndex);
+		currentRange = new Fragment(startBlockIndex);
 		return this;
 	}
 
 	public Transformations moveTo(int startBlockIndex, int size) {
-		currentRange = new InputRange(startBlockIndex, size);
+		currentRange = new Fragment(startBlockIndex, size);
 		return this;
 	}
 
 	public Transformations moveTo(int startBlockIndex, int startInlineIndex, int size) {
-		currentRange = new InputRange(startBlockIndex, startInlineIndex, size);
+		currentRange = new Fragment(startBlockIndex, startInlineIndex, size);
 		return this;
 	}
 
@@ -581,7 +559,7 @@ public class Transformations {
 
 	private static final Pattern WHITE_SPACE = Pattern.compile("\\s*");
 
-	private BoxTreeWalker moveToRange(BoxTreeWalker doc, InputRange range) throws CanNotPerformTransformationException {
+	private BoxTreeWalker moveToRange(BoxTreeWalker doc, Fragment range) throws CanNotPerformTransformationException {
 		assertThat(range != null);
 		doc.root();
 		int n = range.startBlockIndex;
