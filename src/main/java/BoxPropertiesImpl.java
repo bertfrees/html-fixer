@@ -28,14 +28,6 @@ public class BoxPropertiesImpl extends Style implements BoxProperties {
 			return backgroundColor();
 		else if ("visibility".equals(prop))
 			return visibility();
-		else if ("top".equals(prop))
-			return top();
-		else if ("right".equals(prop))
-			return right();
-		else if ("bottom".equals(prop))
-			return bottom();
-		else if ("left".equals(prop))
-			return left();
 		else
 			throw new IllegalArgumentException();
 	}
@@ -87,22 +79,6 @@ public class BoxPropertiesImpl extends Style implements BoxProperties {
 			}
 		}
 		return visibility;
-	}
-
-	public int top() {
-		throw new UnsupportedOperationException();
-	}
-
-	public int right() {
-		throw new UnsupportedOperationException();
-	}
-
-	public int bottom() {
-		throw new UnsupportedOperationException();
-	}
-
-	public int left() {
-		throw new UnsupportedOperationException();
 	}
 
 	public Style relativize(BoxPropertiesImpl base) {
